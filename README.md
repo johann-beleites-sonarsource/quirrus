@@ -1,4 +1,4 @@
-# quirrus
+# Quirrus
 Simple tool to query the Cirrus CI API 
 
 You need to decide which peachee branches you want to fetch the data from. We'll use `dotnet` and 
@@ -8,6 +8,10 @@ You can either run it directy with gradle:
 ```./gradlew run --args="dotnet dotnet-symbolic"```
 
 Or run the jar by passing the branches as command line arguments directly.
+
+Quirrus will fetch the logs for each branch in parallel (but won't try to fetch several branches' 
+logs in parallel). This gives pretty decent performance and is necessary, since a single request 
+for a log is quite slow.
 
 ## A note on authentication
 You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based
