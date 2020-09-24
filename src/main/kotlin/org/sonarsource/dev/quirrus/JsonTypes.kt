@@ -1,0 +1,10 @@
+package org.sonarsource.dev.quirrus
+
+data class Response(val data: Data)
+data class Data(val repository: Repository)
+data class Repository(val builds: Builds)
+data class Builds(val edges: List<Edge>)
+data class Edge(val node: Node)
+data class Node(val tasks: List<Task>)
+data class Task(val id: String, val name: String)
+
