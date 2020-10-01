@@ -5,7 +5,9 @@ You need to decide which peachee branches you want to fetch the data from. We'll
 `dotnet-symbolic` for our example here.
 
 You can either run it directy with gradle:
-```CIRRUS_COOKIE="<valid-cirrus-cookie>" ./gradlew run --args="-r <repository-id> -x '<regex-to-extract-data-from-log>' [branches to download data for]"```
+```
+CIRRUS_COOKIE="<valid-cirrus-cookie>" ./gradlew run --args="-r <repository-id> -x '<regex-to-extract-data-from-log>' [branches to download data for]"
+```
 
 Or run the jar by passing the branches as command line arguments directly.
 
