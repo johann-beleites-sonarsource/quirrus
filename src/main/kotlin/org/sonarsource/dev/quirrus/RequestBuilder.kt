@@ -4,7 +4,8 @@ import com.github.kittinunf.fuel.core.Request
 import me.lazmaid.kraph.Kraph
 
 object RequestBuilder {
-    fun logDownloadLink(taskId: String) = "https://api.cirrus-ci.com/v1/task/$taskId/logs/scanner_end.log"
+    fun logDownloadLink(taskId: String, logName: String) =
+        "https://api.cirrus-ci.com/v1/task/$taskId/logs/$logName"
 
     fun tasksQuery(repositoryId: String, branchName: String) =
         Kraph {

@@ -48,6 +48,7 @@ fun main(rawArgs: Array<String>) {
             repositoryId = args.repositoryId,
             branches = branches,
             dataExtractorRegex = args.dataExtractionRegex,
+            logName = args.logName,
             notFoundPlaceHolder = args.notFoundPlaceholder,
             logger = cliLogger
         ).run()
@@ -60,6 +61,7 @@ class Main(
     private val repositoryId: String,
     private val branches: List<String>,
     private val dataExtractorRegex: Regex,
+    private val logName: String,
     private val notFoundPlaceHolder: String,
     private val logger: CliLogger?
 ) {
@@ -91,7 +93,7 @@ class Main(
     private fun fetchRawDataForTasks(tasks: List<Task>): List<Pair<Task, String>> {
         val rawData = mutableListOf<Pair<Task, String>>()
         tasks.map { task ->
-            RequestBuilder.logDownloadLink(task.id)
+            RequestBuilder.logDownloadLink(task.id, logName)
                 .also { logger?.verbose { "Downloading log for '${task.name}' (${task.id}) from $it..." } }
                 .httpGet()
                 .authenticate()

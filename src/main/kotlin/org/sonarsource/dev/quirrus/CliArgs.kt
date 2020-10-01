@@ -44,5 +44,10 @@ class CliArgs : CliktCommand() {
         help = "Will be used whenever a value could not be found/extracted in place of that value."
     ).default("-")
 
+    val logName by option(
+        "-l", "--log-name",
+        help = "The name of the log file to download"
+    ).required()
+
     override fun run() = Unit
 }
