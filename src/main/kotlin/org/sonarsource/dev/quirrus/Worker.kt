@@ -18,7 +18,7 @@ class Worker(
     private val authenticator: (Request) -> Request,
     private val repositoryId: String,
     private val builds: List<Build>,
-    private val dataExtractorRegex: Regex,
+    private val dataExtractorRegexes: List<Regex>,
     private val logName: String,
     private val notFoundPlaceHolder: String,
     private val logger: CliLogger?
@@ -26,25 +26,29 @@ class Worker(
     fun run() {
         val collector = mutableMapOf<String, MutableMap<Build, String>>()
         builds
-            .asSequence()
             .map { build -> build to getTasksForLatestBuild(build) }
             .map { (build, tasks) ->
                 logger?.print { "Fetching logs for build '$build'" }
                 build to fetchRawDataForTasks(tasks).sortedBy { (task, _) -> task.name }
             }
-            .map { (build, tasksWithData) ->
-                tasksWithData.map { (task, rawData) ->
-                    dataExtractorRegex.find(rawData)?.run {
-                        groups["data"]?.value
-                    }?.let { data ->
-                        collector.computeIfAbsent(task.name) { mutableMapOf() }
-                        collector[task.name]!!.put(build, data)
-                    }
+            .let { dataList ->
+                dataExtractorRegexes.forEach { dataExtractorRegex ->
+                    dataList
+                        .map { (build, tasksWithData) ->
+                            tasksWithData.map { (task, rawData) ->
+                                dataExtractorRegex.find(rawData)?.run {
+                                    groups["data"]?.value
+                                }?.let { data ->
+                                    collector.computeIfAbsent(task.name) { mutableMapOf() }
+                                    collector[task.name]!!.put(build, data)
+                                }
+                            }
+                            build
+                        }
+                        .toList()
+                        .let { Printer.csvPrint("# regex: $dataExtractorRegex", it, collector, notFoundPlaceHolder) }
                 }
-                build
             }
-            .toList()
-            .let { Printer.csvPrint(it, collector, notFoundPlaceHolder) }
     }
 
     private fun fetchRawDataForTasks(tasks: List<Task>): List<Pair<Task, String>> {

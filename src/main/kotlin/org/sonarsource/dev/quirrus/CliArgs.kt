@@ -22,10 +22,10 @@ class CliArgs : CliktCommand() {
                     "environment variable"
     ).default(System.getenv("CIRRUS_COOKIE") ?: "")
 
-    val dataExtractionRegex by option(
+    val dataExtractionRegexes by option(
             "-x", "--regex",
             help = "The regex used for data extraction. E.g. to extract the time in ms the C# scanner ran: "
-    ).convert { it.toRegex(RegexOption.MULTILINE) }.required()
+    ).convert { it.toRegex(RegexOption.MULTILINE) }.multiple(required = true)
 
     val verbose by option("-v", "--verbose").flag(default = false)
 

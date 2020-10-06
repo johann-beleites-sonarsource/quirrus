@@ -29,7 +29,9 @@ fun main(rawArgs: Array<String>) {
         }
     }
 
-    cliLogger.print { "Using data extraction regex \"${args.dataExtractionRegex}\"" }
+    cliLogger.print {
+        "Using data extraction regexes: [ ${args.dataExtractionRegexes.joinToString(separator = ", ") { r -> "\"$r\"" }} ]"
+    }
 
     args.branches.let { builds ->
         cliLogger.print { "Starting for builds: ${builds.joinToString(", ")}" }
@@ -38,7 +40,7 @@ fun main(rawArgs: Array<String>) {
             authenticator = authenticator,
             repositoryId = args.repositoryId,
             builds = builds.map { Build.ofBuild(it) },
-            dataExtractorRegex = args.dataExtractionRegex,
+            dataExtractorRegexes = args.dataExtractionRegexes,
             logName = args.logName,
             notFoundPlaceHolder = args.notFoundPlaceholder,
             logger = cliLogger
