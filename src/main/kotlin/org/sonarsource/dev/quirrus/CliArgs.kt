@@ -25,7 +25,7 @@ class CliArgs : CliktCommand() {
     val dataExtractionRegex by option(
             "-x", "--regex",
             help = "The regex used for data extraction. E.g. to extract the time in ms the C# scanner ran: "
-    ).convert { it.toRegex() }.required()
+    ).convert { it.toRegex(RegexOption.MULTILINE) }.required()
 
     val verbose by option("-v", "--verbose").flag(default = false)
 
