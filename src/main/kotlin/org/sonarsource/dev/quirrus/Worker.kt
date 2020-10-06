@@ -43,8 +43,7 @@ class Worker(
                 }
                 build
             }
-            .toSet()
-            .sorted()
+            .toList()
             .let { Printer.csvPrint(it, collector, notFoundPlaceHolder) }
     }
 
