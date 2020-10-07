@@ -17,7 +17,7 @@ for a log is quite slow.
 
 By default, Quirrus will fetch the latest build for a branch. You can adjust that behaviour by passing e.g. `my-branch~2` as branch name then it will fetch the second-latest build for branch `my-branch`. In other words, passing `my-branch` as branch name is a shorthand for `my-branch~1`
 
-You can also supply multiple regexes by specifying multiple `-x` arguments. Quirrus will download the logs once and apply all regexes to every log, printing the results for each regex without having to re-download the logs all the time.
+You can also supply multiple regexes by specifying multiple `-x` arguments. Quirrus will download the logs once and apply all regexes to every log, printing the results for each regex without having to re-download the logs all the time. Note that *every regex needs to have a `data` class*, which will be used to extract the desired values from the first match in the log.
 
 ## A note on Authentication
 You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based

@@ -7,25 +7,32 @@ import com.github.ajalt.clikt.parameters.options.*
 
 class CliArgs : CliktCommand() {
     val repositoryId by option(
-            "-r", "--repository",
-            help = "The ID of the repository in question."
+        "-r", "--repository",
+        help = "The ID of the repository in question."
     ).required()
 
     val apiToken: String by option(
-            "-t", "--token",
-            help = "The API token to access Cirrus CI"
+        "-t", "--token",
+        help = "The API token to access Cirrus CI"
     ).default(System.getenv("CIRRUS_TOKEN") ?: "")
 
     val cookie: String by option(
-            "--cookie",
-            help = "Alternatively to a token, you can use cookie authentication. In that case, use this flag or the " +
-                    "environment variable"
+        "--cookie",
+        help = "Alternatively to a token, you can use cookie authentication. In that case, use this flag or the " +
+                "environment variable"
     ).default(System.getenv("CIRRUS_COOKIE") ?: "")
 
     val dataExtractionRegexes by option(
-            "-x", "--regex",
-            help = "The regex used for data extraction. E.g. to extract the time in ms the C# scanner ran: "
-    ).convert { it.toRegex(RegexOption.MULTILINE) }.multiple(required = true)
+        "-x", "--regex",
+        help = "The regex used for data extraction. Each regex must contain a \"data\" class, which will be used to " +
+                "extract the data. Multiple regexes are allowed."
+    ).convert { it.toRegex(RegexOption.MULTILINE) }
+        .multiple(required = true)
+        .check { regexList ->
+            regexList
+                .map { regex -> regex.pattern.indexOf("(?<data>") >= 0 }
+                .fold(true, { acc, v -> acc && v })
+        }
 
     val verbose by option("-v", "--verbose").flag(default = false)
 
