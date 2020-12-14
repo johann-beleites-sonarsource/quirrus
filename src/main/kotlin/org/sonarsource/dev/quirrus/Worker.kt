@@ -26,7 +26,7 @@ class Worker(
     fun run() {
         val collector = mutableMapOf<String, MutableMap<Build, String>>()
         builds
-            .map { build -> build to getTasksForLatestBuild(build) }
+            .map { build -> getTasksForLatestBuild(build) }
             .map { (build, tasks) ->
                 logger?.print { "Fetching logs for build '$build'" }
                 build to fetchRawDataForTasks(tasks).sortedBy { (task, _) -> task.name }
@@ -79,7 +79,7 @@ class Worker(
         return rawData
     }
 
-    private fun getTasksForLatestBuild(build: Build): List<Task> {
+    private fun getTasksForLatestBuild(build: Build): Pair<BuildWithMetadata, List<Task>> {
         val objectMapper = ObjectMapper().registerKotlinModule()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         objectMapper.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
@@ -95,9 +95,11 @@ class Worker(
                         exitProcess(1)
                     }
                     is Result.Success -> {
-                        extractAllTasks(result).also {
-                            logger?.print {
-                                "Successfully extracted ${it.size} tasks for build '$build' (${getBuildId(result)})"
+                        BuildWithMetadata(getBuildId(result), getBuildDate(result), build).let { buildWithMetadata ->
+                            buildWithMetadata to extractAllTasks(result).also {
+                                logger?.print {
+                                    "Successfully extracted ${it.size} tasks for build '$buildWithMetadata'"
+                                }
                             }
                         }
                     }
@@ -108,8 +110,12 @@ class Worker(
     private fun extractAllTasks(result: Result<Response, FuelError>): List<Task> =
         result.get().data.repository.builds.edges.let { it[it.size - 1].node.tasks }
 
-    private fun getBuildId(result: Result<Response, FuelError>): String =
-        result.get().data.repository.builds.edges.let { it[it.size - 1].node.id }
+    private fun getBuildId(result: Result<Response, FuelError>): String = getBuildNode(result).id
+
+    private fun getBuildDate(result: Result<Response, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
+
+    private fun getBuildNode(result: Result<Response, FuelError>): Node =
+        result.get().data.repository.builds.edges.let { it[it.size - 1].node }
 
     private fun Request.authenticate(): Request = authenticator(this)
 }

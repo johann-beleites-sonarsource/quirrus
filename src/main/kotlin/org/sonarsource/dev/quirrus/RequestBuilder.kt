@@ -1,6 +1,5 @@
 package org.sonarsource.dev.quirrus
 
-import com.github.kittinunf.fuel.core.Request
 import me.lazmaid.kraph.Kraph
 
 object RequestBuilder {
@@ -15,6 +14,7 @@ object RequestBuilder {
                         fieldObject("edges") {
                             fieldObject("node") {
                                 field("id")
+                                field("buildCreatedTimestamp")
                                 fieldObject("tasks") {
                                     field("name")
                                     field("id")

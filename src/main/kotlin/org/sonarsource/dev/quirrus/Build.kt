@@ -4,7 +4,7 @@ import kotlin.system.exitProcess
 
 val buildWithLastNumberParserRegex = "(?<branch>[^~]+)(~(?<number>[0-9]*))?".toRegex()
 
-class Build private constructor(
+open class Build protected constructor(
     val buildString: String,
     val branchName: String,
     val buildOffset: Int
@@ -26,6 +26,15 @@ class Build private constructor(
         }
     }
 
-    override fun toString(): String = buildString;
+    override fun toString(): String = buildString
     override fun compareTo(other: Build): Int = buildString.compareTo(other.buildString)
+}
+
+class BuildWithMetadata(
+    val buildId: String, val buildDate: Long, buildString: String, branchName: String, buildOffset: Int
+) : Build(buildString, branchName, buildOffset) {
+    constructor(buildId: String, buildDate: Long, build: Build)
+            : this(buildId, buildDate, build.buildString, build.branchName, build.buildOffset)
+
+    override fun toString(): String = "$buildString ($buildId)"
 }
