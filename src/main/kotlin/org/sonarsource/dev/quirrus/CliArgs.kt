@@ -8,12 +8,12 @@ import com.github.ajalt.clikt.parameters.options.*
 class CliArgs : CliktCommand() {
     val repositoryId by option(
         "-r", "--repository",
-        help = "The ID of the repository in question."
+        help = "The numeric ID of the repository in question."
     ).required()
 
     val apiToken: String by option(
         "-t", "--token",
-        help = "The API token to access Cirrus CI"
+        help = "The API token to access Cirrus CI. If it doesn't work, try and use the cookie instead."
     ).default(System.getenv("CIRRUS_TOKEN") ?: "")
 
     val cookie: String by option(
@@ -53,7 +53,7 @@ class CliArgs : CliktCommand() {
 
     val logName by option(
         "-l", "--log-name",
-        help = "The name of the log file to download"
+        help = "The name of the Cirrus task log file to download"
     ).required()
 
     override fun run() = Unit
