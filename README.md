@@ -1,12 +1,18 @@
 # Quirrus
 Simple tool to query the Cirrus CI API 
 
-You need to decide which peachee branches you want to fetch the data from. We'll use `dotnet` and 
-`dotnet-symbolic` for our example here.
+You need to decide which peachee branches you want to fetch the data from.
 
 You can either run it directy with gradle:
 ```
 CIRRUS_COOKIE="<valid cirrus cookie>" ./gradlew run --args="-r <repository id> -l <log file name> -x '<regex to extract data from log>' [branches to download data for]"
+```
+
+Please note that the repository ID is numeric. You can find it when looking at the repository settings, inside the URL (e.g. `https://cirrus-ci.com/settings/repository/<REPOSITORY_ID>`).
+
+Example (querying the `dotnet` branch):
+```
+.\gradlew run --args="-r 5933424424517632 -l scanner_end.log --regex 'Found (?<data>.*)' dotnet"
 ```
 
 Alternatively you can build it with gradle and run the jar file directly, of course.
@@ -20,11 +26,8 @@ By default, Quirrus will fetch the latest build for a branch. You can adjust tha
 You can also supply multiple regexes by specifying multiple `-x` arguments. Quirrus will download the logs once and apply all regexes to every log, printing the results for each regex without having to re-download the logs all the time. Note that *every regex needs to have a `data` class*, which will be used to extract the desired values from the first match in the log.
 
 ## A note on Authentication
-You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based
-authentication. If you don't have a/the valid token, you can copy+paste your cookies from the
-browser (simply copy the `Cookie` request header content from a request made to cirrus-ci in your
-browser). 
+You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based authentication. However, token-based authentication doesn't seem to work with user tokens.
 
-If you have a token, put it into the environment variable `CIRRUS_TOKEN`. If you don't, put your
-cookie into the environment variable `CIRRUS_COOKIE`. If you set both variables it will always try
-to use the token.
+**Suggestion: use cookie-based authentication**: you can copy+paste your cookies from the browser (simply copy the `Cookie` request header content from a request made to cirrus-ci in your browser to retrieve the logs for a build).
+
+Also, until Cirrus CI user tokens will work, only set the `CIRRUS_COOKIE` environment variable. If you set both variables ( `CIRRUS_TOKEN` and `CIRRUS_COOKIE` ) it will always try to use the token.
