@@ -28,6 +28,6 @@ You can also supply multiple regexes by specifying multiple `-x` arguments. Quir
 ## A note on Authentication
 You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based authentication. However, token-based authentication doesn't seem to work with user tokens.
 
-**Suggestion: use cookie-based authentication**: you can copy+paste your cookies from the browser (simply copy the `Cookie` request header content from a request made to cirrus-ci in your browser to retrieve the logs for a build).
+**Suggestion: use cookie-based authentication**: you can copy+paste your cookies from the browser. For this, simply copy the `Cookie` request header content from a request made to `api.cirrus-ci.com` in your browser to retrieve the logs for a build. Cirrus-ci will make a request to `api.cirrus-ci.com` pretty much when loading any page, it will also make other requests, though, which don't have the desired `Cookie` header but a different (for us useless) one.
 
 Also, until Cirrus CI user tokens will work, only set the `CIRRUS_COOKIE` environment variable. If you set both variables ( `CIRRUS_TOKEN` and `CIRRUS_COOKIE` ) it will always try to use the token.
