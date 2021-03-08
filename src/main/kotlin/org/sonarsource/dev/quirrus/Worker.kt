@@ -88,34 +88,46 @@ class Worker(
             .authenticate()
             .jsonBody(RequestBuilder.tasksQuery(repositoryId, build.branchName, build.buildOffset).toRequestString())
             .responseObject<Response>()
-            .let { (_, _, result) ->
+            .let { (request, _, result) ->
                 when (result) {
                     is Result.Failure -> {
                         logger?.error("Failure: ${result.error.localizedMessage}")
                         exitProcess(1)
                     }
                     is Result.Success -> {
-                        BuildWithMetadata(getBuildId(result), getBuildDate(result), build).let { buildWithMetadata ->
-                            buildWithMetadata to extractAllTasks(result).also {
-                                logger?.print {
-                                    "Successfully extracted ${it.size} tasks for build '$buildWithMetadata'"
+                        if (result.get().errors == null) {
+                            BuildWithMetadata(
+                                getBuildId(result),
+                                getBuildDate(result),
+                                build
+                            ).let { buildWithMetadata ->
+                                buildWithMetadata to extractAllTasks(result).also {
+                                    logger?.print {
+                                        "Successfully extracted ${it.size} tasks for build '$buildWithMetadata'"
+                                    }
                                 }
                             }
+                        } else {
+                            logger?.error("Errors encountered while sending request to ${request.url}:")
+                            for (error in result.get().errors!!) {
+                                logger?.error("  ${error.message}")
+                            }
+                            exitProcess(2);
                         }
                     }
                 }
             }
     }
 
-    private fun extractAllTasks(result: Result<Response, FuelError>): List<Task> =
-        result.get().data.repository.builds.edges.let { it[it.size - 1].node.tasks }
+    private fun extractAllTasks(result: Result<Response, FuelError>): List<Task> = getBuildNode(result).tasks
 
     private fun getBuildId(result: Result<Response, FuelError>): String = getBuildNode(result).id
 
     private fun getBuildDate(result: Result<Response, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
 
     private fun getBuildNode(result: Result<Response, FuelError>): Node =
-        result.get().data.repository.builds.edges.let { it[it.size - 1].node }
+        result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
+            ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
 
     private fun Request.authenticate(): Request = authenticator(this)
 }
