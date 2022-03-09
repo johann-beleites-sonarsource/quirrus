@@ -1,17 +1,19 @@
 package org.sonarsource.dev.quirrus
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.fuel.core.Request
 import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.fuel.httpPost
-import com.github.kittinunf.fuel.jackson.responseObject
+import com.github.kittinunf.fuel.serialization.responseObject
 import com.github.kittinunf.result.Result
+import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
+
+private val json = Json {
+    isLenient = true
+    ignoreUnknownKeys = true
+}
 
 class Worker(
     private val apiUrl: String,
@@ -61,8 +63,8 @@ class Worker(
                 .responseString { request, _, result ->
                     when (result) {
                         is Result.Failure -> logger?.error(
-                            "ERROR: Could not get fetch data for '${task.name}' from ${request.url}: " +
-                                    "${result.error.localizedMessage}."
+                            "ERROR: Could not fetch data for '${task.name}' from ${request.url}: " +
+                                "${result.error.localizedMessage}."
                         )
                         is Result.Success -> {
                             logger?.verbose { "SUCCESS: Download of log for '${task.name}' from ${request.url} done." }
@@ -80,14 +82,10 @@ class Worker(
     }
 
     private fun getTasksForLatestBuild(build: Build): Pair<BuildWithMetadata, List<Task>> {
-        val objectMapper = ObjectMapper().registerKotlinModule()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        objectMapper.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
-
         return apiUrl.httpPost()
             .authenticate()
             .jsonBody(RequestBuilder.tasksQuery(repositoryId, build.branchName, build.buildOffset).toRequestString())
-            .responseObject<Response>()
+            .responseObject<Response>(json)
             .let { (request, _, result) ->
                 when (result) {
                     is Result.Failure -> {

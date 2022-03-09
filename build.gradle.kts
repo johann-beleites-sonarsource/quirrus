@@ -2,12 +2,13 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     java
-    kotlin("jvm") version "1.4.10"
     application
+    kotlin("jvm") version "1.6.10"
+    kotlin("plugin.serialization") version "1.6.10"
 }
 
 group = "com.sonarsource.dev"
-version = "0.1"
+version = "0.2"
 
 repositories {
     mavenCentral()
@@ -15,7 +16,7 @@ repositories {
 }
 
 application {
-    mainClassName = "org.sonarsource.dev.quirrus.MainKt"
+    mainClass.set("org.sonarsource.dev.quirrus.MainKt")
 }
 
 tasks.withType<KotlinCompile> {
@@ -24,12 +25,10 @@ tasks.withType<KotlinCompile> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("com.github.kittinunf.fuel:fuel:2.3.0")
-    implementation("com.github.kittinunf.fuel:fuel-jackson:2.3.0")
+    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
+    implementation("com.github.kittinunf.fuel:fuel-kotlinx-serialization:2.3.1")
     implementation("me.lazmaid.kraph:kraph:0.6.1")
-    implementation("com.fasterxml.jackson.core:jackson-core:2.11.2")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.11.2")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.2")
-    implementation("com.github.ajalt.clikt:clikt:3.0.1")
-    testCompile("junit", "junit", "4.12")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    implementation("com.github.ajalt.clikt:clikt:3.4.0")
 }
