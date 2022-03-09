@@ -3,7 +3,7 @@ package org.sonarsource.dev.quirrus
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Response(val data: Data? = null, val errors: List<ResponseError>? = null)
+data class ApiResponse(val data: Data? = null, val errors: List<ResponseError>? = null)
 
 @Serializable
 data class Data(val repository: Repository? = null)

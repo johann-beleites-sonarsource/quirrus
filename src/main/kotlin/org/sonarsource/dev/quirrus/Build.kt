@@ -4,7 +4,7 @@ import kotlin.system.exitProcess
 
 val buildWithLastNumberParserRegex = "(?<branch>[^~]+)(~(?<number>[0-9]*))?".toRegex()
 
-open class Build protected constructor(
+open class Build constructor(
     val buildString: String,
     val branchName: String,
     val buildOffset: Int

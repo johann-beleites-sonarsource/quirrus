@@ -3,48 +3,16 @@ package org.sonarsource.dev.quirrus
 import com.github.kittinunf.fuel.core.Request
 import kotlin.system.exitProcess
 
+private val COMMANDS = mapOf<String, (List<String>) -> Unit>(
+    "EXTRACT" to { ExtractorWorker().main(it) },
+    "LOGS" to { LogDownloader().main(it) },
+)
 
 fun main(rawArgs: Array<String>) {
-    val args = CliArgs().also { it.main(rawArgs) }
-    val token = args.apiToken
-    val cookie = args.cookie
-
-    val cliLogger = CliLogger(verbose = args.verbose, quiet = args.quiet)
-
-    val authenticator: (Request) -> Request = when {
-        token.isNotEmpty() -> {
-            cliLogger.print { "Using token authentication" };
-            { request: Request -> request.header("Authorization", "Bearer $token") }
+    rawArgs.firstOrNull()?.uppercase()?.let { COMMANDS[it] }?.let { it(rawArgs.drop(1)) }
+        ?: run {
+            System.err.println("Available commands: ${COMMANDS.keys.joinToString()}")
+            exitProcess(1)
         }
-        cookie.isNotEmpty() -> {
-            cliLogger.print { "Using cookie authentication" };
-            { request: Request -> request.header("Cookie", cookie) }
-        }
-        else -> {
-            cliLogger.error(
-                "No authentication details provided. Expecting environment variable CIRRUS_TOKEN or " +
-                        "CIRRUS_COOKIE to be set."
-            )
-            exitProcess(2)
-        }
-    }
-
-    cliLogger.print {
-        "Using data extraction regexes: [ ${args.dataExtractionRegexes.joinToString(separator = ", ") { r -> "\"$r\"" }} ]"
-    }
-
-    args.branches.let { builds ->
-        cliLogger.print { "Starting for builds: ${builds.joinToString(", ")}" }
-        Worker(
-            apiUrl = args.apiUrl,
-            authenticator = authenticator,
-            repositoryId = args.repositoryId,
-            builds = builds.map { Build.ofBuild(it) },
-            dataExtractorRegexes = args.dataExtractionRegexes,
-            logName = args.logName,
-            notFoundPlaceHolder = args.notFoundPlaceholder,
-            logger = cliLogger
-        ).run()
-    }
 }
 
