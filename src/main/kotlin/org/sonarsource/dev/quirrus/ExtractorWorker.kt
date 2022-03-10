@@ -9,7 +9,6 @@ import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.kittinunf.fuel.core.FuelError
-import com.github.kittinunf.fuel.core.Request
 import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.result.Result
 
@@ -102,9 +101,7 @@ class ExtractorWorker : CirrusCommand() {
         return rawData
     }
 
-    private fun getBuildNode(result: Result<ApiResponse, FuelError>): Node =
+    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): Node =
         result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
             ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
-
-    private fun Request.authenticate(): Request = authenticator(this)
 }

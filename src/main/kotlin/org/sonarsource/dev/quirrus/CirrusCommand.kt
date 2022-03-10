@@ -7,7 +7,17 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.kittinunf.fuel.core.Request
+import com.github.kittinunf.fuel.core.extensions.jsonBody
+import com.github.kittinunf.fuel.httpPost
+import com.github.kittinunf.fuel.serialization.responseObject
+import com.github.kittinunf.result.getOrElse
+import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
+
+private val json = Json {
+    isLenient = true
+    ignoreUnknownKeys = true
+}
 
 abstract class CirrusCommand : CliktCommand() {
     val apiUrl by option(
@@ -20,10 +30,21 @@ abstract class CirrusCommand : CliktCommand() {
         help = "Set the timeout for API requests in seconds."
     ).int()
 
-    val repositoryId by option(
+    private val repositoryIdOrName: String by option(
         "-r", "--repository",
-        help = "The numeric ID of the repository in question."
+        help = "The numeric ID or name of the repository in question."
     ).required()
+
+    val repositoryId by lazy {
+        runCatching {
+            repositoryIdOrName.toLong()
+            repositoryIdOrName
+        }.getOrElse {
+            resolveRepositoryId(repositoryIdOrName).also {
+                logger.print { "Found ID '$it' for repository '$repositoryIdOrName'" }
+            }
+        }
+    }
 
     val apiToken: String by option(
         "-t", "--token",
@@ -65,4 +86,24 @@ abstract class CirrusCommand : CliktCommand() {
             }
         }
     }
+
+    fun Request.authenticate(): Request = authenticator(this)
+
+    private fun resolveRepositoryId(repoName: String) =
+        apiUrl.httpPost()
+            .authenticate()
+            .let { request ->
+                requestTimeout?.let { request.timeout(it) } ?: request
+            }
+            .jsonBody(RequestBuilder.repoIdQuery(repoName).toRequestString())
+            .responseObject<OwnerRepositoryApiResponse>(json)
+            .let { (request, _, result) ->
+                result.getOrElse { e ->
+                    logger.error("Could not fetch repository ID for '$repoName': ${e.localizedMessage}")
+                    exitProcess(1)
+                }.data?.ownerRepository?.id ?: run {
+                    logger.error("Could not fetch repository ID for '$repoName' (got null).")
+                    exitProcess(1)
+                }
+            }
 }

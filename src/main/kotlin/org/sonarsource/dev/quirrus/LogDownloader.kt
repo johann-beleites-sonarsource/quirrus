@@ -15,19 +15,18 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
-import kotlin.system.exitProcess
 
 class LogDownloader : CirrusCommand() {
 
     val branch: String? by option(
         "-b", "--branch",
-        help = "The branch from which to get the logs from. This must be supplied if tasks isn't."
+        help = "The branch from which to get the logs from. If not provided, quirrus will not filter for branches."
     )
 
     val numberOfTasks: Int by option(
         "-n", "--number-of-tasks",
         help = "The number of tasks for which to fetch the logs, starting and including the newest task, going backwards in time."
-    ).int().default(1)
+    ).int().default(0)
 
     val tasks: List<String>? by option(
         "-k", "--tasks",
@@ -48,16 +47,11 @@ class LogDownloader : CirrusCommand() {
     val targetDirectory: Path by argument().path(mustExist = true, canBeFile = false)
 
     override fun run() {
-        if (branch == null && tasks == null) {
-            System.err.println("At least branch or tasks must be set.")
-            exitProcess(1)
-        }
-
         val genericWorker = GenericWorker(this)
 
-        val discoveredTasks = branch?.let { branchName ->
+        val discoveredTasks =
             (0 until numberOfTasks).map {
-                Build("$branch~$it", branchName, it)
+                Build("${branch ?: ""}~$it", branch, it)
             }.map { build ->
                 GlobalScope.async {
                     genericWorker.getTasksForBuild(build).second
@@ -69,7 +63,6 @@ class LogDownloader : CirrusCommand() {
             }.filter { task ->
                 tasks?.contains(task.name) ?: false
             }.map { it.id }
-        } ?: emptyList()
 
         runBlocking {
             downloadLogs((taskIds ?: emptyList()) + discoveredTasks)

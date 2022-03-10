@@ -8,14 +8,14 @@ You need to decide which peachee branches you want to fetch the data from.
 
 You can either run it directy with gradle:
 ```
-CIRRUS_COOKIE="<valid cirrus cookie>" ./gradlew run --args="EXTRACT -r <repository id> -l <log file name> -x '<regex to extract data from log>' [branches to download data for]"
+CIRRUS_COOKIE="<valid cirrus cookie>" ./gradlew run --args="EXTRACT -r <repository id or name> -l <log file name> -x '<regex to extract data from log>' [branches to download data for]"
 ```
 
-Please note that the repository ID is numeric. You can find it when looking at the repository settings, inside the URL (e.g. `https://cirrus-ci.com/settings/repository/<REPOSITORY_ID>`).
+For `github/SonarSource/<repositoryName>` you can provide the repository name and Quirrus will resolve its ID. Alternatively, you can provide the repository ID directly. Please note that the repository ID is numeric. You can find it when looking at the repository settings, inside the URL (e.g. `https://cirrus-ci.com/settings/repository/<REPOSITORY_ID>`).
 
 Example (querying the `dotnet` branch):
 ```
-.\gradlew run --args="EXTRACT -r 5933424424517632 -l scanner_end.log --regex 'Found (?<data>.*)' dotnet"
+.\gradlew run --args="EXTRACT -r peachee-languages -l scanner_end.log --regex 'Found (?<data>.*)' dotnet"
 ```
 
 Alternatively you can build it with gradle and run the jar file directly, of course.

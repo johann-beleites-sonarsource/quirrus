@@ -6,7 +6,7 @@ val buildWithLastNumberParserRegex = "(?<branch>[^~]+)(~(?<number>[0-9]*))?".toR
 
 open class Build constructor(
     val buildString: String,
-    val branchName: String,
+    val branchName: String?,
     val buildOffset: Int
 ) : Comparable<Build> {
     companion object {
@@ -31,7 +31,7 @@ open class Build constructor(
 }
 
 class BuildWithMetadata(
-    val buildId: String, val buildDate: Long, buildString: String, branchName: String, buildOffset: Int
+    val buildId: String, val buildDate: Long, buildString: String, branchName: String?, buildOffset: Int
 ) : Build(buildString, branchName, buildOffset) {
     constructor(buildId: String, buildDate: Long, build: Build)
             : this(buildId, buildDate, build.buildString, build.branchName, build.buildOffset)

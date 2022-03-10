@@ -60,16 +60,16 @@ class GenericWorker(val cirrusCommand: CirrusCommand) {
                 cirrusCommand.requestTimeout?.let { request.timeout(it) } ?: request
             }
             .jsonBody(RequestBuilder.tasksQuery(cirrusCommand.repositoryId, build.branchName, build.buildOffset).toRequestString())
-            .responseObject<ApiResponse>(json)
+            .responseObject<RepositoryApiResponse>(json)
 
 
-    private fun extractAllTasks(result: Result<ApiResponse, FuelError>) = getBuildNode(result).tasks
+    private fun extractAllTasks(result: Result<RepositoryApiResponse, FuelError>) = getBuildNode(result).tasks
 
-    private fun getBuildId(result: Result<ApiResponse, FuelError>): String = getBuildNode(result).id
+    private fun getBuildId(result: Result<RepositoryApiResponse, FuelError>): String = getBuildNode(result).id
 
-    private fun getBuildDate(result: Result<ApiResponse, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
+    private fun getBuildDate(result: Result<RepositoryApiResponse, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
 
-    private fun getBuildNode(result: Result<ApiResponse, FuelError>): Node =
+    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): Node =
         result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
             ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
 

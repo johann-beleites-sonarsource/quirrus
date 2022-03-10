@@ -3,10 +3,10 @@ package org.sonarsource.dev.quirrus
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ApiResponse(val data: Data? = null, val errors: List<ResponseError>? = null)
+data class RepositoryApiResponse(val data: RepositoryData? = null, val errors: List<ResponseError>? = null)
 
 @Serializable
-data class Data(val repository: Repository? = null)
+data class RepositoryData(val repository: Repository? = null)
 
 @Serializable
 data class Repository(val builds: Builds)
@@ -25,4 +25,13 @@ data class Task(val id: String, val name: String)
 
 @Serializable
 data class ResponseError(val message: String)
+
+@Serializable
+data class OwnerRepositoryApiResponse(val data: OwnerRepositoryData? = null, val errors: List<ResponseError>? = null)
+
+@Serializable
+data class OwnerRepositoryData(val ownerRepository: OwnerRepository)
+
+@Serializable
+data class OwnerRepository(val id: String)
 
