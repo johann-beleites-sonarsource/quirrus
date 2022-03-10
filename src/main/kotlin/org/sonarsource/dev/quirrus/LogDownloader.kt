@@ -67,28 +67,28 @@ class LogDownloader : CirrusCommand() {
             }.filter { (task, _) ->
                 tasks?.contains(task.name) ?: false
             }.map { (task, buildNode) ->
-                task.id to buildNode
+                task to buildNode
             }
 
         runBlocking {
-            downloadLogs((taskIds?.map { it to null } ?: emptyList()) + discoveredTasks)
+            downloadLogs((taskIds?.map { Task(it, "UNKNOWN", 0) to null } ?: emptyList()) + discoveredTasks)
         }
     }
 
     val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
-    private suspend fun downloadLogs(taskIds: List<Pair<String, BuildNode?>>) {
-        taskIds.map { (taskId, buildNode) ->
+    private suspend fun downloadLogs(taskIds: List<Pair<Task, BuildNode?>>) {
+        taskIds.map { (task, buildNode) ->
             GlobalScope.launch {
                 val destinationPath = if (buildNode != null) {
                     val branchEscaped = buildNode.branch.replace(File.separatorChar, '_').replace(File.pathSeparatorChar, '_')
-                    val buildTime = dateFormat.format(Date(buildNode.buildCreatedTimestamp))
+                    val buildTime = dateFormat.format(Date(task.creationTimestamp))
 
-                    targetDirectory.resolve("${logFileName}_${buildTime}_${branchEscaped}_$taskId.log")
+                    targetDirectory.resolve("${logFileName}_${buildTime}_${branchEscaped}_${task.id}.log")
                 } else {
-                    targetDirectory.resolve("${logFileName}_$taskId.log")
+                    targetDirectory.resolve("${logFileName}_${task.id}.log")
                 }
-                val downloadLink = RequestBuilder.logDownloadLink(taskId, logFileName)
-                logger.verbose { "Downloading log for task $taskId from $downloadLink..." }
+                val downloadLink = RequestBuilder.logDownloadLink(task.id, logFileName)
+                logger.verbose { "Downloading log for task ${task.id} from $downloadLink..." }
                 runCatching {
                     downloadLink
                         .httpGet()

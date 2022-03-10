@@ -21,7 +21,7 @@ data class Edge(val node: BuildNode)
 data class BuildNode(val id: String, val buildCreatedTimestamp: Long, val tasks: List<Task>, val branch: String)
 
 @Serializable
-data class Task(val id: String, val name: String)
+data class Task(val id: String, val name: String, val creationTimestamp: Long)
 
 @Serializable
 data class ResponseError(val message: String)

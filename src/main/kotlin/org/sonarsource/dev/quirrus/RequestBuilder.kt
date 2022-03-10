@@ -23,6 +23,7 @@ object RequestBuilder {
                                 fieldObject("tasks") {
                                     field("name")
                                     field("id")
+                                    field("creationTimestamp")
                                 }
                             }
                         }
