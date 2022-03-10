@@ -101,7 +101,7 @@ class ExtractorWorker : CirrusCommand() {
         return rawData
     }
 
-    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): Node =
+    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): BuildNode =
         result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
             ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
 }

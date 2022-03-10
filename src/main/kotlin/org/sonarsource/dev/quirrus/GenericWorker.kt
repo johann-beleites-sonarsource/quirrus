@@ -30,7 +30,8 @@ class GenericWorker(val cirrusCommand: CirrusCommand) {
                                 return BuildWithMetadata(
                                     getBuildId(result),
                                     getBuildDate(result),
-                                    build
+                                    build,
+                                    getBuildNode(result)
                                 ).let { buildWithMetadata ->
                                     buildWithMetadata to extractAllTasks(result).also {
                                         logger.print {
@@ -69,7 +70,7 @@ class GenericWorker(val cirrusCommand: CirrusCommand) {
 
     private fun getBuildDate(result: Result<RepositoryApiResponse, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
 
-    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): Node =
+    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): BuildNode =
         result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
             ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
 

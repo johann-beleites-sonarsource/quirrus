@@ -31,10 +31,10 @@ open class Build constructor(
 }
 
 class BuildWithMetadata(
-    val buildId: String, val buildDate: Long, buildString: String, branchName: String?, buildOffset: Int
+    val buildId: String, val buildDate: Long, buildString: String, branchName: String?, buildOffset: Int, val buildNode: BuildNode
 ) : Build(buildString, branchName, buildOffset) {
-    constructor(buildId: String, buildDate: Long, build: Build)
-            : this(buildId, buildDate, build.buildString, build.branchName, build.buildOffset)
+    constructor(buildId: String, buildDate: Long, build: Build, buildNode: BuildNode)
+            : this(buildId, buildDate, build.buildString, build.branchName, build.buildOffset, buildNode)
 
     override fun toString(): String = "$buildString ($buildId)"
 }

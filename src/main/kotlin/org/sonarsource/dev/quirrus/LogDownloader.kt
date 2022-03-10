@@ -14,7 +14,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.nio.file.Path
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class LogDownloader : CirrusCommand() {
 
@@ -54,30 +57,42 @@ class LogDownloader : CirrusCommand() {
                 Build("${branch ?: ""}~$it", branch, it)
             }.map { build ->
                 GlobalScope.async {
-                    genericWorker.getTasksForBuild(build).second
+                    val (buildNode, tasks) = genericWorker.getTasksForBuild(build)
+                    tasks.map { it to buildNode.buildNode }
                 }
             }.flatMap {
                 runBlocking {
                     it.await()
                 }
-            }.filter { task ->
+            }.filter { (task, _) ->
                 tasks?.contains(task.name) ?: false
-            }.map { it.id }
+            }.map { (task, buildNode) ->
+                task.id to buildNode
+            }
 
         runBlocking {
-            downloadLogs((taskIds ?: emptyList()) + discoveredTasks)
+            downloadLogs((taskIds?.map { it to null } ?: emptyList()) + discoveredTasks)
         }
     }
 
-    private suspend fun downloadLogs(taskIds: List<String>) {
-        taskIds.map { taskId ->
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
+    private suspend fun downloadLogs(taskIds: List<Pair<String, BuildNode?>>) {
+        taskIds.map { (taskId, buildNode) ->
             GlobalScope.launch {
-                val destinationPath = targetDirectory.resolve("${logFileName}_$taskId.log")
+                val destinationPath = if (buildNode != null) {
+                    val branchEscaped = buildNode.branch.replace(File.separatorChar, '_').replace(File.pathSeparatorChar, '_')
+                    val buildTime = dateFormat.format(Date(buildNode.buildCreatedTimestamp))
+
+                    targetDirectory.resolve("${logFileName}_${buildTime}_${branchEscaped}_$taskId.log")
+                } else {
+                    targetDirectory.resolve("${logFileName}_$taskId.log")
+                }
                 val downloadLink = RequestBuilder.logDownloadLink(taskId, logFileName)
                 logger.verbose { "Downloading log for task $taskId from $downloadLink..." }
                 runCatching {
                     downloadLink
                         .httpGet()
+                        .authenticate()
                         .download()
                         .fileDestination { _, _ -> destinationPath.toFile() }
                         .awaitUnit()

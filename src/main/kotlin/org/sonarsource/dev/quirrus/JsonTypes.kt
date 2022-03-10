@@ -15,10 +15,10 @@ data class Repository(val builds: Builds)
 data class Builds(val edges: List<Edge>)
 
 @Serializable
-data class Edge(val node: Node)
+data class Edge(val node: BuildNode)
 
 @Serializable
-data class Node(val id: String, val buildCreatedTimestamp: Long, val tasks: List<Task>)
+data class BuildNode(val id: String, val buildCreatedTimestamp: Long, val tasks: List<Task>, val branch: String)
 
 @Serializable
 data class Task(val id: String, val name: String)
@@ -30,7 +30,7 @@ data class ResponseError(val message: String)
 data class OwnerRepositoryApiResponse(val data: OwnerRepositoryData? = null, val errors: List<ResponseError>? = null)
 
 @Serializable
-data class OwnerRepositoryData(val ownerRepository: OwnerRepository)
+data class OwnerRepositoryData(val ownerRepository: OwnerRepository?)
 
 @Serializable
 data class OwnerRepository(val id: String)

@@ -97,7 +97,7 @@ abstract class CirrusCommand : CliktCommand() {
             }
             .jsonBody(RequestBuilder.repoIdQuery(repoName).toRequestString())
             .responseObject<OwnerRepositoryApiResponse>(json)
-            .let { (request, _, result) ->
+            .let { (_, _, result) ->
                 result.getOrElse { e ->
                     logger.error("Could not fetch repository ID for '$repoName': ${e.localizedMessage}")
                     exitProcess(1)

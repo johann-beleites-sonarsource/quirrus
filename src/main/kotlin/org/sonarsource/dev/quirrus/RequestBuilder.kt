@@ -19,6 +19,7 @@ object RequestBuilder {
                             fieldObject("node") {
                                 field("id")
                                 field("buildCreatedTimestamp")
+                                field("branch")
                                 fieldObject("tasks") {
                                     field("name")
                                     field("id")
