@@ -14,7 +14,7 @@ import com.github.kittinunf.result.getOrElse
 import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
 
-private val json = Json {
+val json = Json {
     isLenient = true
     ignoreUnknownKeys = true
 }

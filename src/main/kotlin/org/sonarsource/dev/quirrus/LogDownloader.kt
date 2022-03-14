@@ -8,16 +8,20 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
 import com.github.kittinunf.fuel.core.awaitUnit
+import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.github.kittinunf.fuel.core.requests.download
 import com.github.kittinunf.fuel.httpGet
+import com.github.kittinunf.fuel.httpPost
+import com.github.kittinunf.fuel.serialization.responseObject
+import com.github.kittinunf.result.getOrElse
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.system.exitProcess
 
 class LogDownloader : CirrusCommand() {
 
@@ -50,30 +54,38 @@ class LogDownloader : CirrusCommand() {
     val targetDirectory: Path by argument().path(mustExist = true, canBeFile = false)
 
     override fun run() {
-        val genericWorker = GenericWorker(this)
-
-        val discoveredTasks =
-            (0 until numberOfTasks).map {
-                Build("${branch ?: ""}~$it", branch, it)
-            }.map { build ->
-                GlobalScope.async {
-                    val (buildNode, tasks) = genericWorker.getTasksForBuild(build)
-                    tasks.map { it to buildNode.buildNode }
+        val discoveredTasks = getLastNBuilds(numberOfTasks).let { (_, _, result) ->
+            result.getOrElse { e ->
+                logger.error("Could not fetch last $numberOfTasks builds: $e")
+                exitProcess(1)
+            }.let { apiResponse ->
+                tasks
+                apiResponse.data?.repository?.builds?.edges?.flatMap { edge ->
+                    edge.node.let { buildNode ->
+                        buildNode.tasks.filter { task ->
+                            tasks?.contains(task.name) ?: true
+                        }.map { it to buildNode }
+                    }
+                } ?: run {
+                    logger.error("Got invalid response while trying to get last $numberOfTasks builds: $apiResponse")
+                    exitProcess(1)
                 }
-            }.flatMap {
-                runBlocking {
-                    it.await()
-                }
-            }.filter { (task, _) ->
-                tasks?.contains(task.name) ?: false
-            }.map { (task, buildNode) ->
-                task to buildNode
             }
+        }
 
         runBlocking {
             downloadLogs((taskIds?.map { Task(it, "UNKNOWN", 0) to null } ?: emptyList()) + discoveredTasks)
         }
     }
+
+    fun getLastNBuilds(numberOfBuilds: Int) =
+        apiUrl.httpPost()
+            .authenticate()
+            .let { request ->
+                requestTimeout?.let { request.timeout(it) } ?: request
+            }
+            .jsonBody(RequestBuilder.tasksQuery(repositoryId, branch, numberOfBuilds).toRequestString())
+            .responseObject<RepositoryApiResponse>(json)
 
     val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
     private suspend fun downloadLogs(taskIds: List<Pair<Task, BuildNode?>>) {

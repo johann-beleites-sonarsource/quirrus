@@ -6,13 +6,7 @@ import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.github.kittinunf.fuel.httpPost
 import com.github.kittinunf.fuel.serialization.responseObject
 import com.github.kittinunf.result.Result
-import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
-
-private val json = Json {
-    isLenient = true
-    ignoreUnknownKeys = true
-}
 
 class GenericWorker(val cirrusCommand: CirrusCommand) {
     private val logger by lazy { cirrusCommand.logger }
