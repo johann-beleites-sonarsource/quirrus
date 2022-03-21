@@ -21,6 +21,7 @@ import java.io.File
 import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.system.exitProcess
 
 class LogDownloader : CirrusCommand() {
@@ -54,7 +55,7 @@ class LogDownloader : CirrusCommand() {
     val targetDirectory: Path by argument().path(mustExist = true, canBeFile = false)
 
     override fun run() {
-        val discoveredTasks = getLastNBuilds(numberOfTasks).let { (_, _, result) ->
+        val discoveredTasks = getLastNBuilds(numberOfTasks).let { (req, _, result) ->
             result.getOrElse { e ->
                 logger.error("Could not fetch last $numberOfTasks builds: $e")
                 exitProcess(1)
@@ -82,13 +83,18 @@ class LogDownloader : CirrusCommand() {
         apiUrl.httpPost()
             .authenticate()
             .let { request ->
-                requestTimeout?.let { request.timeout(it) } ?: request
+                requestTimeout?.let {
+                    request.timeout(it * 1000)
+                    request.timeoutRead(it * 1000)
+                } ?: request
             }
             .jsonBody(RequestBuilder.tasksQuery(repositoryId, branch, numberOfBuilds).toRequestString())
             .responseObject<RepositoryApiResponse>(json)
 
     val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
     private suspend fun downloadLogs(taskIds: List<Pair<Task, BuildNode?>>) {
+        var successful = AtomicInteger()
+        var failed = AtomicInteger()
         taskIds.map { (task, buildNode) ->
             GlobalScope.launch {
                 val destinationPath = if (buildNode != null) {
@@ -109,13 +115,17 @@ class LogDownloader : CirrusCommand() {
                         .fileDestination { _, _ -> destinationPath.toFile() }
                         .awaitUnit()
                 }.onFailure { e ->
+                    failed.incrementAndGet()
                     logger.error("Error downloading $destinationPath from '$downloadLink': ${e.localizedMessage}")
                 }.onSuccess {
+                    successful.incrementAndGet()
                     logger.print { "Downloaded $destinationPath." }
                 }
             }
         }.forEach {
             it.join()
         }
+
+        logger.print { "Downloaded ${successful.get()} successfully, ${failed.get()} failed." }
     }
 }
