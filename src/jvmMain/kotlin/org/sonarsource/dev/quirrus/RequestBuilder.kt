@@ -41,4 +41,13 @@ object RequestBuilder {
                 }
             }
         }
+
+    fun viewerId() =
+        Kraph {
+            query {
+                fieldObject("viewer") {
+                    field("id")
+                }
+            }
+        }
 }
