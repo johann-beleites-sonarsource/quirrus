@@ -35,3 +35,11 @@ data class OwnerRepositoryData(val ownerRepository: OwnerRepository?)
 @Serializable
 data class OwnerRepository(val id: String)
 
+@Serializable
+data class ViewerApiResponse(val data: ViewerContainer)
+
+@Serializable
+data class ViewerContainer(val viewer: Viewer)
+
+@Serializable
+data class Viewer(val id: String)

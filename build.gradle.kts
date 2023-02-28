@@ -13,6 +13,8 @@ plugins {
 group = "com.sonarsource.dev"
 version = "0.2"
 
+val javaTarget: String by project
+
 repositories {
     google()
     mavenCentral()
@@ -20,15 +22,12 @@ repositories {
     jcenter()
 }
 
-/*application {
-    mainClass.set("org.sonarsource.dev.quirrus.MainKt")
-}*/
-
 kotlin {
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "11"
+            kotlinOptions.jvmTarget = javaTarget
         }
+        withJava()
     }
 
     sourceSets {
@@ -49,16 +48,6 @@ kotlin {
     }
 }
 
-/*dependencies {
-    implementation(kotlin("stdlib-jdk8"))
-    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
-    implementation("com.github.kittinunf.fuel:fuel-kotlinx-serialization:2.3.1")
-    implementation("me.lazmaid.kraph:kraph:0.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
-    implementation("com.github.ajalt.clikt:clikt:3.4.0")
-}*/
-
 compose.desktop {
     application {
         mainClass = "org.sonarsource.dev.quirrus.MainKt"
@@ -71,6 +60,6 @@ compose.desktop {
 }
 
 javafx {
-    version = "16"
+    version = javaTarget
     modules = listOf("javafx.controls", "javafx.swing", "javafx.web", "javafx.graphics")
 }
