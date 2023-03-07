@@ -132,7 +132,7 @@ fun WallboardApp() {
                                 contentColor = MaterialTheme.colors.onPrimary
                             )
                         ) {
-                            Text("$branch (${lastTasks.get(branch)?.failed?.size})")
+                            Text("$branch (${lastTasks.get(branch)?.let { uniqueFailures(it.failed, it.completed) }?.size})")
                         }
                     }
 

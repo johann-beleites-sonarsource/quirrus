@@ -25,6 +25,7 @@ object RequestBuilder {
                                     field("id")
                                     field("creationTimestamp")
                                     field("status")
+                                    field("automaticReRun")
                                     fieldObject("firstFailedCommand") {
                                         field("name")
                                         field("durationInSeconds")

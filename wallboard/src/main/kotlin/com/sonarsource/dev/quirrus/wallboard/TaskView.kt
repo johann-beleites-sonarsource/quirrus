@@ -43,7 +43,10 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
             append("$title ")
 
             pushStyle(MaterialTheme.typography.h5.toSpanStyle())
-            append("(${failed.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
+
+            val realFailures = uniqueFailures(failed, completed)
+
+            append("(${realFailures.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
         }.toAnnotatedString().let {
             Text(it)
             //Text("(${failed.size} failed | ${completed.size} completed | ${tasks.size} total)")
@@ -62,12 +65,17 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
                 //items(failed) { task ->
                 for (task in failed) {
+                    val backgroundColor =
+                        if (completed.any { it.task.name == task.task.name }) MaterialTheme.colors.secondary
+                        else if (!task.task.automaticReRun) MaterialTheme.colors.error
+                        else MaterialTheme.colors.error.copy(alpha = 0.4f)
+
                     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
                         Column {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(color = MaterialTheme.colors.error)
+                                    .background(backgroundColor)
                                     .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
                             ) {
                                 Text(
@@ -174,4 +182,8 @@ fun openWebpage(uri: URI?): Boolean {
         }
     }
     return false
+}
+
+fun uniqueFailures(failed: List<EnrichedTask>, completed: List<EnrichedTask>) = failed.filter { f ->
+    !f.task.automaticReRun && completed.none { c -> c.task.name == f.task.name }
 }
