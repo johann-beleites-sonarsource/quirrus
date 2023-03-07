@@ -44,9 +44,7 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
 
             pushStyle(MaterialTheme.typography.h5.toSpanStyle())
 
-            val realFailures = uniqueFailures(failed, completed)
-
-            append("(${realFailures.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
+            append("(${failed.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
         }.toAnnotatedString().let {
             Text(it)
             //Text("(${failed.size} failed | ${completed.size} completed | ${tasks.size} total)")
@@ -64,63 +62,68 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
         Box {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
                 //items(failed) { task ->
-                for (task in failed) {
-                    val backgroundColor =
-                        if (completed.any { it.task.name == task.task.name }) MaterialTheme.colors.secondary
-                        else if (!task.task.automaticReRun) MaterialTheme.colors.error
-                        else MaterialTheme.colors.error.copy(alpha = 0.4f)
+                for (enrichedTask in failed) {
+                    enrichedTask.tasks.forEachIndexed { index, task ->
+                        val backgroundColor = with(
+                            if (completed.any { it.tasks.first().name == task.name }) MaterialTheme.colors.secondary
+                            else MaterialTheme.colors.error
+                        ) {
+                            if (index > 0) copy(alpha = 0.4f)
+                            else this
+                        }
 
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(backgroundColor)
-                                    .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
-                            ) {
-                                Text(
-                                    task.task.name,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colors.onError
-                                )
-
-                                SinceText(task, MaterialTheme.colors.onError)
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(color = MaterialTheme.colors.error.copy(alpha = 0.2f))
-                                    .padding(top = 1.dp, bottom = 2.dp)
-                            ) {
-                                val text = AnnotatedString.Builder().apply {
-                                    pushStyle(
-                                        MaterialTheme.typography.body2.toSpanStyle()
-                                            .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
-                                    )
-                                    append(task.task.firstFailedCommand?.name ?: "???")
-
-                                    pushStyle(
-                                        MaterialTheme.typography.body2.toSpanStyle()
-                                            .copy(fontWeight = FontWeight.Light, color = MaterialTheme.colors.onBackground)
-                                    )
-                                    append(" ${task.task.status}")
-
-                                    task.task.firstFailedCommand?.durationInSeconds?.let { duration ->
-                                        pushStyle(
-                                            MaterialTheme.typography.body2.toSpanStyle()
-                                                .copy(color = MaterialTheme.colors.onBackground)
-                                        )
-                                        append(" after $duration s")
-                                    }
-                                }.toAnnotatedString()
-
-                                ClickableText(
-                                    text,
+                        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
+                            Column {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 20.dp),
+                                        .background(backgroundColor)
+                                        .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
                                 ) {
-                                    openWebpage(URI("https://cirrus-ci.com/task/${task.task.id}"))
+                                    Text(
+                                        task.name,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = MaterialTheme.colors.onError
+                                    )
+
+                                    SinceText(enrichedTask, MaterialTheme.colors.onError)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(color = MaterialTheme.colors.error.copy(alpha = 0.2f))
+                                        .padding(top = 1.dp, bottom = 2.dp)
+                                ) {
+                                    val text = AnnotatedString.Builder().apply {
+                                        pushStyle(
+                                            MaterialTheme.typography.body2.toSpanStyle()
+                                                .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
+                                        )
+                                        append(task.firstFailedCommand?.name ?: "???")
+
+                                        pushStyle(
+                                            MaterialTheme.typography.body2.toSpanStyle()
+                                                .copy(fontWeight = FontWeight.Light, color = MaterialTheme.colors.onBackground)
+                                        )
+                                        append(" ${task.status}")
+
+                                        task.firstFailedCommand?.durationInSeconds?.let { duration ->
+                                            pushStyle(
+                                                MaterialTheme.typography.body2.toSpanStyle()
+                                                    .copy(color = MaterialTheme.colors.onBackground)
+                                            )
+                                            append(" after $duration s")
+                                        }
+                                    }.toAnnotatedString()
+
+                                    ClickableText(
+                                        text,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 20.dp),
+                                    ) {
+                                        openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
+                                    }
                                 }
                             }
                         }
@@ -131,7 +134,7 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
                 for (task in completed) {
                     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
                         Text(
-                            task.task.name,
+                            task.tasks.last().name,
                             modifier = Modifier
                                 .background(color = MaterialTheme.colors.secondary)
                                 .padding(all = 5.dp)
@@ -164,7 +167,7 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
             text,
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
-            task.lastBuildWithDifferentStatus.tasks.firstOrNull { it.name == task.task.name }?.let { task ->
+            task.lastBuildWithDifferentStatus.tasks.firstOrNull { it.name == task.tasks.first().name }?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
             }
         }
@@ -182,8 +185,4 @@ fun openWebpage(uri: URI?): Boolean {
         }
     }
     return false
-}
-
-fun uniqueFailures(failed: List<EnrichedTask>, completed: List<EnrichedTask>) = failed.filter { f ->
-    !f.task.automaticReRun && completed.none { c -> c.task.name == f.task.name }
 }

@@ -67,22 +67,26 @@ private fun processData(builds: Map<String, Builds?>) =
         // This could be more efficient e.g. by transforming the data into maps to lookup in instead
 
         val (completed, failed) = latestBuild.tasks
-            .map { currentTask ->
+            .groupBy { it.name }
+            .map { (name, tasks) ->
+                val tasksSorted = tasks.sortedBy { it.id }
+                val currentTask = tasksSorted.last()
+
                 val lastDifferingBuild = previousBuilds.firstOrNull { previousBuild ->
                     previousBuild.tasks.firstOrNull { previousTask ->
                         previousTask.name == currentTask.name
                     }?.status != currentTask.status
                 }
 
-                EnrichedTask(currentTask, latestBuild, lastDifferingBuild)
+                EnrichedTask(tasks, latestBuild, lastDifferingBuild)
             }.partition {
-                it.task.status == "COMPLETED"
+                it.tasks.last().status == "COMPLETED"
             }
 
         branch to SortedTasks(completed, failed)
     }.toMap()
 
-data class EnrichedTask(val task: Task, val build: BuildNode, val lastBuildWithDifferentStatus: BuildNode?)
+data class EnrichedTask(val tasks: List<Task>, val build: BuildNode, val lastBuildWithDifferentStatus: BuildNode?)
 data class SortedTasks(val completed: List<EnrichedTask>, val failed: List<EnrichedTask>)
 
 @Composable
@@ -132,7 +136,7 @@ fun WallboardApp() {
                                 contentColor = MaterialTheme.colors.onPrimary
                             )
                         ) {
-                            Text("$branch (${lastTasks.get(branch)?.let { uniqueFailures(it.failed, it.completed) }?.size})")
+                            Text("$branch (${lastTasks.get(branch)?.failed?.size})")
                         }
                     }
 
