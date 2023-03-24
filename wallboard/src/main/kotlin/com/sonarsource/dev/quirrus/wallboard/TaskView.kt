@@ -19,8 +19,11 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIconDefaults
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,7 @@ import java.text.SimpleDateFormat
 
 private val timeDateFormat = SimpleDateFormat("dd.MM.yyy hh:mm")
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<EnrichedTask>) {
     Column(
@@ -120,7 +124,8 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
                                         text,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(start = 20.dp),
+                                            .padding(start = 20.dp)
+                                            .pointerHoverIcon(PointerIconDefaults.Hand),
                                     ) {
                                         openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
                                     }
@@ -155,6 +160,7 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
     task.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
@@ -165,7 +171,9 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
 
         ClickableText(
             text,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .pointerHoverIcon(PointerIconDefaults.Hand),
         ) {
             task.lastBuildWithDifferentStatus.tasks.firstOrNull { it.name == task.tasks.first().name }?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
