@@ -1,4 +1,4 @@
-package com.sonarsource.dev.quirrus.wallboard
+package com.sonarsource.dev.quirrus.wallboard.guicomponents
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize

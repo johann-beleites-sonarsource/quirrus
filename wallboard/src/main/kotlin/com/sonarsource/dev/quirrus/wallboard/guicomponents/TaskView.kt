@@ -1,4 +1,4 @@
-package com.sonarsource.dev.quirrus.wallboard
+package com.sonarsource.dev.quirrus.wallboard.guicomponents
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -135,7 +136,6 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
                     }
                 }
 
-                //items(completed) { task ->
                 for (task in completed) {
                     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
                         Text(

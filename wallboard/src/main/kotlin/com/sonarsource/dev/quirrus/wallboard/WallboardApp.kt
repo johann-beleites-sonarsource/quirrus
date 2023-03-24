@@ -24,6 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.Label
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
@@ -161,16 +164,11 @@ fun WallboardApp() {
                     )
 
                     lastTasks.keys.sorted().forEach { branch ->
-                        Button(
+                        SideTab(
                             onClick = { selectedTab = branch },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                backgroundColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant,
-                                contentColor = MaterialTheme.colors.onPrimary
-                            )
-                        ) {
-                            Text("$branch (${lastTasks.get(branch)?.failed?.size})")
-                        }
+                            text = "$branch (${lastTasks.get(branch)?.failed?.size})",
+                            bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
+                        )
                     }
 
                     TextField(
