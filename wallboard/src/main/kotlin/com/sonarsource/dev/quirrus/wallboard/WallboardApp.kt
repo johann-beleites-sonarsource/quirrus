@@ -22,14 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.Label
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
-import org.sonarsource.dev.quirrus.api.ApiException
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
-import java.lang.IllegalStateException
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createFile
@@ -50,7 +50,9 @@ private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.co
     }
 }
 
-private val initialBranches = configFile.readText().split(',')
+private val configStrings = configFile.readText().split(";")
+private val initialBranches = configStrings.elementAtOrNull(0)?.split(',') ?: emptyList()
+private val initialRepo = configStrings.elementAtOrNull(1) ?: ""
 
 var cirrusData = CirrusData(API_CONF)
 
@@ -91,36 +93,54 @@ private fun processData(builds: Map<String, Builds?>) =
 data class EnrichedTask(val tasks: List<Task>, val build: BuildNode, val lastBuildWithDifferentStatus: BuildNode?)
 data class SortedTasks(val completed: List<EnrichedTask>, val failed: List<EnrichedTask>)
 
+private enum class AppState {
+    LOADING, ERROR, NONE
+}
+
 @Composable
 @Preview
 fun WallboardApp() {
-    var loading by remember { mutableStateOf(false) }
+    var state by remember { mutableStateOf(AppState.NONE) }
+    var error by remember { mutableStateOf("Unknown") }
     var lastTasks by remember { mutableStateOf(emptyMap<String, SortedTasks?>()) }
     var selectedTab: String? by remember { mutableStateOf(null) }
     var branches by remember { mutableStateOf(initialBranches) }
     var branchesTextFieldVal by remember { mutableStateOf(initialBranches.joinToString(",")) }
+    var repoTextFieldVal by remember { mutableStateOf(initialRepo) }
+
 
     fun reload() {
-        if (!loading) {
-            loading = true
+        if (state != AppState.LOADING) {
+            state = AppState.LOADING
 
-            configFile.writeText(branches.joinToString(","))
+            configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal")
 
             GlobalScope.launch {
                 runCatching {
-                    lastTasks = processData(cirrusData.getLastPeachBuilds(branches, 15))
+                    lastTasks = processData(cirrusData.getLastPeachBuilds(repoTextFieldVal, branches, 15))
                 }.onFailure { e ->
-                    e.printStackTrace(System.err)
-                    if (e::class in listOf(NoSuchFileException::class, java.nio.file.NoSuchFileException::class, ApiException::class)) {
-                        GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
+                    error = e.stackTraceToString()
+
+                    if (e is NoSuchFileException || e is java.nio.file.NoSuchFileException) {
+                        error = "Have you tried authenticating?\n\n$error"
                     }
+
+                    state = AppState.ERROR
+                    e.printStackTrace(System.err)
                 }.onSuccess {
                     if (selectedTab == null) {
                         selectedTab = lastTasks.keys.minOf { it }
                     }
+                    state = AppState.NONE
                 }
-                loading = false
             }
+        }
+    }
+
+    fun authenticate() {
+        GlobalScope.launch {
+            GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
+            reload()
         }
     }
 
@@ -132,6 +152,14 @@ fun WallboardApp() {
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Column(modifier = Modifier.weight(0.1f)) {
+                    TextField(
+                        value = repoTextFieldVal,
+                        label = { Label("Cirrus repo ID") },
+                        onValueChange = { newValue ->
+                            repoTextFieldVal = newValue
+                        }
+                    )
+
                     lastTasks.keys.sorted().forEach { branch ->
                         Button(
                             onClick = { selectedTab = branch },
@@ -145,14 +173,18 @@ fun WallboardApp() {
                         }
                     }
 
-                    TextField(value = branchesTextFieldVal, onValueChange = { newValue ->
-                        branchesTextFieldVal = newValue
-                        branches = newValue.split(',')
-                    })
+                    TextField(
+                        value = branchesTextFieldVal,
+                        label = { Label("Branches (comma-separated)") },
+                        onValueChange = { newValue ->
+                            branchesTextFieldVal = newValue
+                            branches = newValue.split(',')
+                        }
+                    )
 
                     Button(
                         onClick = ::reload,
-                        enabled = !loading,
+                        enabled = state != AppState.LOADING,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = MaterialTheme.colors.secondary,
@@ -161,11 +193,23 @@ fun WallboardApp() {
                     ) {
                         Icon(Icons.Outlined.Refresh, "Refresh")
                     }
+
+                    Button(
+                        onClick = ::authenticate,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = MaterialTheme.colors.secondary,
+                            contentColor = MaterialTheme.colors.onSecondary
+                        ),
+                    ) {
+                        Text("Authenticate")
+                    }
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
-                    when (loading) {
-                        true -> LoadingScreen()
+                    when (state) {
+                        AppState.LOADING -> LoadingScreen()
+                        AppState.ERROR -> ErrorScreen(error)
                         else -> lastTasks.get(selectedTab)?.let { (completed, failed) ->
                             TaskList("$selectedTab Peach Jobs", completed, failed)
                         }

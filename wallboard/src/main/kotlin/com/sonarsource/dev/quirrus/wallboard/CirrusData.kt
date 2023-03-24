@@ -5,12 +5,9 @@ import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.ApiException
 import org.sonarsource.dev.quirrus.api.LogDownloader
 
-//private const val PEACHEE_CIRRUS_REPO = "5933424424517632"
-private const val PEACHEE_CIRRUS_REPO = "5216277258567680"
-
 class CirrusData(val apiConfig: ApiConfiguration) {
-    fun getLastPeachBuilds(branch: String, numberOfBuilds: Int = 1) =
-        LogDownloader(apiConfig).getLastNBuilds(PEACHEE_CIRRUS_REPO, branch, numberOfBuilds).let { (_, response, result) ->
+    fun getLastPeachBuilds(repo: String, branch: String, numberOfBuilds: Int = 1) =
+        LogDownloader(apiConfig).getLastNBuilds(repo, branch, numberOfBuilds).let { (_, response, result) ->
             result.getOrElse {
                 throw it
             }.let { repositoryApiResponse ->
@@ -22,8 +19,8 @@ class CirrusData(val apiConfig: ApiConfiguration) {
             }
         }
 
-    fun getLastPeachBuilds(branches: List<String>, numberOfBuilds: Int = 1) =
+    fun getLastPeachBuilds(repo: String, branches: List<String>, numberOfBuilds: Int = 1) =
         branches.associateWith { branch ->
-            getLastPeachBuilds(branch, numberOfBuilds)
+            getLastPeachBuilds(repo, branch, numberOfBuilds)
         }
 }
