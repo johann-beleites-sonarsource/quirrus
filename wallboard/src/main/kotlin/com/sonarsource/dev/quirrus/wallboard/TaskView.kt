@@ -147,7 +147,7 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
                             color = MaterialTheme.colors.onSecondary
                         )
 
-                        SinceText(task, MaterialTheme.colors.secondary)
+                        SinceText(task, MaterialTheme.colors.onSecondary)
                     }
                 }
             }
