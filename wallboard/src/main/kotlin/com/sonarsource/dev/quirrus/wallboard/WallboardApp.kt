@@ -75,7 +75,7 @@ private fun processData(builds: Map<String, Builds?>) =
                 val lastDifferingBuild = previousBuilds.firstOrNull { previousBuild ->
                     previousBuild.tasks.firstOrNull { previousTask ->
                         previousTask.name == currentTask.name
-                    }?.status != currentTask.status
+                    }?.status !in listOf(currentTask.status, "SKIPPED", "ABORTED")
                 }
 
                 EnrichedTask(tasks, latestBuild, lastDifferingBuild)
