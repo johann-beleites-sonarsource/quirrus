@@ -7,7 +7,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 object Authentication {
-    fun loadCookies(configFile: Path) = configFile.readText()
+    fun loadCookies(configFile: Path) = configFile.readText().trim()
 
     fun storeCookies(configFile: Path, cookies: String) = configFile
         .also {

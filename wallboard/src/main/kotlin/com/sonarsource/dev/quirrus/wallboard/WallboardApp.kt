@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
+import org.sonarsource.dev.quirrus.api.ApiException
+import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.lang.IllegalStateException
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -109,6 +111,9 @@ fun WallboardApp() {
                     lastTasks = processData(cirrusData.getLastPeachBuilds(branches, 15))
                 }.onFailure { e ->
                     e.printStackTrace(System.err)
+                    if (e::class in listOf(NoSuchFileException::class, java.nio.file.NoSuchFileException::class, ApiException::class)) {
+                        GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
+                    }
                 }.onSuccess {
                     if (selectedTab == null) {
                         selectedTab = lastTasks.keys.minOf { it }

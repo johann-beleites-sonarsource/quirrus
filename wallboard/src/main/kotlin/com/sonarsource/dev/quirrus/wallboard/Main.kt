@@ -8,7 +8,6 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.Authentication.authenticateWithConfigFile
-import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.nio.file.Path
 
 val API_CONF = ApiConfiguration(
@@ -16,18 +15,13 @@ val API_CONF = ApiConfiguration(
     requestTimeout = 60
 )
 
-private val AUTH_CONF_FILE = Path.of(System.getenv("HOME"), ".quirrus", "auth.conf")
+val AUTH_CONF_FILE = Path.of(System.getenv("HOME"), ".quirrus", "auth.conf")
 
 private const val MIN_WINDOW_WIDTH = 1400
 private const val MIN_WINDOW_HEIGHT = 900
 
 fun main(args: Array<String>) {
-    try {
-        startWallboard()
-    } catch (e: Exception /* TODO: only catch authentication issues. Also this error-handling does not actually do anything. */) {
-        GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE)
-        startWallboard()
-    }
+    startWallboard()
 }
 
 
