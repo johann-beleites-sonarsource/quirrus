@@ -7,6 +7,7 @@ plugins {
 }
 
 val javaTarget: String by project
+val javaFxVersion: String by project
 
 repositories {
     google()
@@ -21,6 +22,6 @@ dependencies {
 }
 
 javafx {
-    version = javaTarget
+    version = javaFxVersion
     modules = listOf("javafx.controls", "javafx.swing", "javafx.web", "javafx.graphics")
 }
