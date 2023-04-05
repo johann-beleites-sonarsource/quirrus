@@ -32,9 +32,6 @@ javafx {
 }
 
 compose.desktop {
-    application {
-        mainClass = "com.sonarsource.dev.quirrus.wallboard.MainKt"
-    }
 }
 
 tasks {

@@ -4,6 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -14,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
@@ -36,9 +43,6 @@ import java.net.CookieHandler
 import java.net.CookieManager
 import java.nio.file.Path
 import javax.swing.JPanel
-import kotlin.io.path.createDirectories
-import kotlin.io.path.readText
-import kotlin.io.path.writeText
 
 private const val minWidth = 1000
 private const val minHeight = 800
@@ -90,6 +94,16 @@ class GuiAuthenticationHelper(
             var jsObject = remember<JSObject?> { null }
 
             Column {
+                Box(modifier = Modifier.background(MaterialTheme.colors.error).fillMaxWidth()) {
+                    val text = AnnotatedString.Builder().apply {
+                        pushStyle(MaterialTheme.typography.body1.toSpanStyle()
+                            .copy(fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colors.onError))
+                        append("Please do not single sign-on to your organization if asked, this will not work. Simply click 'Continue' instead.")
+                    }.toAnnotatedString()
+
+                    Text(text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp).fillMaxWidth())
+                }
+
                 Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
                     ComposeJFXPanel(
                         composeWindow = window,

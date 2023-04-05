@@ -1,7 +1,6 @@
 package org.sonarsource.dev.quirrus
 
 import me.lazmaid.kraph.Kraph
-import java.util.Objects
 
 object RequestBuilder {
     fun logDownloadLink(taskId: String, logName: String) =

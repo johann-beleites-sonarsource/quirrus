@@ -1,5 +1,12 @@
 # Quirrus
-Simple tool to query the Cirrus CI API for different tasks.
+Simple tool to query the Cirrus CI API for different tasks. If you are using this tool for the first time, you probably want to have a look at the section on authentication at the bottom.
+
+## Cirrus-CI Wallboard
+
+You can get an overview of failed and successful Cirrus-CI tasks. Simply launch this features with:
+```shell
+./gradlew wallboard
+```
 
 ## Automatically extracting data from logs to compare them from one task to the next
 *The examples given here will use peach, in theory you can use whatever cirrus repository you want.*
@@ -35,15 +42,15 @@ CIRRUS_COOKIE="<valid cirrus cookie>" ./gradlew run --args="LOGS -r 632140535169
 ```
 
 ## A note on Authentication
-**NEW:** Quirrus now supports an additional (often more convenient) way to authenticate. By using the `AUTH` command (e.g. `./gradlew run --args="AUTH"`), a GUI will appear, which you can use to authenticate ot Cirrus CI via GitHub. Note that you **do not** need to single sign-on into your organization if it prompts you. In that case, simply press `Continue` instead — as long as Cirrus CI already knows you as a user authenticated via GitHub, it will work without signing in to your organization.
+**NEW:** Quirrus now supports an additional (usually more convenient) way to authenticate. By using the `AUTH` command (e.g. `./gradlew run --args="AUTH"`), a GUI will appear, which you can use to authenticate ot Cirrus CI via GitHub. Note that you **do not** need to single sign-on into your organization if it prompts you. In that case, simply press `Continue` instead — as long as Cirrus CI already knows you as a user authenticated via GitHub, it will work without signing in to your organization.
 
 The `AUTH` command will write cookie data to a config file (which you can configure with `--auth-file`). This cookie data can then be used to make requests. Simply provide the `--auth-file` (or leave it at its default) and make sure to not have tokens or cookies configured explicitly (as they will be preferred over the credentials file).
 
 ---
 Below for completeness other notes and ways to authenticate:
 
-You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based authentication. However, token-based authentication doesn't seem to work with user tokens.
+You need to authenticate to Cirrus CI. This tool currently supports token-based and cookie-based authentication. However, token-based authentication doesn't currently work as expected (Cirrus CI currently does not support user tokens and most users don't have access to organization-level tokens).
 
-**Suggestion: use cookie-based authentication**: you can copy+paste your cookies from the browser. For this, simply copy the `Cookie` request header content from a request made to `api.cirrus-ci.com` in your browser to retrieve the logs for a build. Cirrus-ci will make a request to `api.cirrus-ci.com` pretty much when loading any page, it will also make other requests, though, which don't have the desired `Cookie` header but a different (for us useless) one.
+**Manually using cookie-based authentication**: you can copy+paste your cookies from the browser. For this, simply copy the `Cookie` request header content from a request made to `api.cirrus-ci.com` in your browser to retrieve the logs for a build. Cirrus-ci will make a request to `api.cirrus-ci.com` pretty much when loading any page, it will also make other requests, though, which don't have the desired `Cookie` header but a different (for us useless) one.
 
 Also, until Cirrus CI user tokens will work, only set the `CIRRUS_COOKIE` environment variable. If you set both variables ( `CIRRUS_TOKEN` and `CIRRUS_COOKIE` ) it will always try to use the token.
