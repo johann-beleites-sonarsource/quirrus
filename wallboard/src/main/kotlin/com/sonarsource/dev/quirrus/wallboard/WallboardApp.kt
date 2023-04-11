@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
+import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -53,7 +54,7 @@ private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.co
 }
 
 private val configStrings = configFile.readText().split(";")
-private val initialBranches = configStrings.elementAtOrNull(0)?.split(',').filter { it.isNotBlank() } ?: emptyList()
+private val initialBranches = configStrings.elementAtOrNull(0)?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
 private val initialRepo = configStrings.elementAtOrNull(1) ?: ""
 
 var cirrusData = CirrusData(API_CONF)
@@ -114,7 +115,7 @@ fun WallboardApp() {
     fun reload() {
         if (state != AppState.LOADING) {
             if (repoTextFieldVal.isBlank()) {
-                error = "The Cirrus repo ID is required."
+                error = "The $CIRRUS_REPO_TEXT_FIELD_LABEL is required."
                 state = AppState.ERROR
                 return
             } else if (branches.isEmpty()) {
@@ -129,7 +130,16 @@ fun WallboardApp() {
 
             GlobalScope.launch {
                 runCatching {
-                    lastTasks = processData(cirrusData.getLastPeachBuilds(repoTextFieldVal, branches, 15))
+                    val trimmedRepo = repoTextFieldVal.trim()
+                    val repoId = if (trimmedRepo.toIntOrNull() != null) {
+                        trimmedRepo
+                    } else {
+                        Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
+                            repoTextFieldVal = it
+                        }
+                    }
+
+                    lastTasks = processData(cirrusData.getLastPeachBuilds(repoId, branches, 15))
                 }.onFailure { e ->
                     error = e.stackTraceToString()
 
@@ -166,7 +176,7 @@ fun WallboardApp() {
                 Column(modifier = Modifier.weight(0.1f)) {
                     TextField(
                         value = repoTextFieldVal,
-                        label = { Label("Cirrus repo ID") },
+                        label = { Label(CIRRUS_REPO_TEXT_FIELD_LABEL) },
                         onValueChange = { newValue ->
                             repoTextFieldVal = newValue
                         }
@@ -182,7 +192,7 @@ fun WallboardApp() {
 
                     TextField(
                         value = branchesTextFieldVal,
-                        label = { Label("Branches (comma-separated)") },
+                        label = { Label(BRANCHES_FIELD_LABEL) },
                         onValueChange = { newValue ->
                             branchesTextFieldVal = newValue
                             branches = newValue.split(',').filter { it.isNotBlank() }

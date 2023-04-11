@@ -18,13 +18,15 @@ class Common(val apiConfiguration: ApiConfiguration) {
             }
             .jsonBody(RequestBuilder.repoIdQuery(repoName).toRequestString())
             .responseObject<OwnerRepositoryApiResponse>(json)
-            .let { (_, _, result) ->
+            .let { (_, response, result) ->
                 result.getOrElse { e ->
-                    apiConfiguration.logger?.error("Could not fetch repository ID for '$repoName': ${e.localizedMessage}")
-                    exitProcess(1)
+                    val msg = "Could not fetch repository ID for '$repoName': ${e.localizedMessage}"
+                    apiConfiguration.logger?.error(msg)
+                    throw ApiException(response, msg)
                 }.data?.ownerRepository?.id ?: run {
-                    apiConfiguration.logger?.error("Could not fetch repository ID for '$repoName' (got null).")
-                    exitProcess(1)
+                    val msg = "Could not fetch repository ID for '$repoName' (got null)."
+                    apiConfiguration.logger?.error(msg)
+                    throw ApiException(response, msg)
                 }
             }
 
