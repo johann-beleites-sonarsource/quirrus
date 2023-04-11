@@ -53,7 +53,7 @@ private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.co
 }
 
 private val configStrings = configFile.readText().split(";")
-private val initialBranches = configStrings.elementAtOrNull(0)?.split(',') ?: emptyList()
+private val initialBranches = configStrings.elementAtOrNull(0)?.split(',').filter { it.isNotBlank() } ?: emptyList()
 private val initialRepo = configStrings.elementAtOrNull(1) ?: ""
 
 var cirrusData = CirrusData(API_CONF)
@@ -113,6 +113,16 @@ fun WallboardApp() {
 
     fun reload() {
         if (state != AppState.LOADING) {
+            if (repoTextFieldVal.isBlank()) {
+                error = "The Cirrus repo ID is required."
+                state = AppState.ERROR
+                return
+            } else if (branches.isEmpty()) {
+                error = "You need to provide at least 1 branch to fetch data for."
+                state = AppState.ERROR
+                return
+            }
+
             state = AppState.LOADING
 
             configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal")
@@ -175,8 +185,8 @@ fun WallboardApp() {
                         label = { Label("Branches (comma-separated)") },
                         onValueChange = { newValue ->
                             branchesTextFieldVal = newValue
-                            branches = newValue.split(',')
-                        }
+                            branches = newValue.split(',').filter { it.isNotBlank() }
+                        },
                     )
 
                     Button(
