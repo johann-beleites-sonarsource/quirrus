@@ -31,9 +31,11 @@ import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
+import java.util.*
 
 
-private val timeDateFormat = SimpleDateFormat("dd.MM.yyy hh:mm")
+private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefault())
+private val dateTimeFormatWithTimezone = SimpleDateFormat("dd.MM.yyy HH:mm Z", Locale.getDefault())
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -43,17 +45,23 @@ fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<Enriched
             .fillMaxSize()
             .padding(5.dp)
     ) {
-        AnnotatedString.Builder().apply {
-            pushStyle(MaterialTheme.typography.h4.toSpanStyle())
-            append("$title ")
+        Box(modifier = Modifier.fillMaxWidth()) {
 
-            pushStyle(MaterialTheme.typography.h5.toSpanStyle())
+            AnnotatedString.Builder().apply {
+                pushStyle(MaterialTheme.typography.h4.toSpanStyle())
+                append("$title ")
 
-            append("(${failed.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
-        }.toAnnotatedString().let {
-            Text(it)
-            //Text("(${failed.size} failed | ${completed.size} completed | ${tasks.size} total)")
+                pushStyle(MaterialTheme.typography.h5.toSpanStyle())
+                append("(${failed.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
+            }.toAnnotatedString().let {
+                Text(it)
+            }
+
+            completed.firstOrNull()?.let { task ->
+                Text(dateTimeFormatWithTimezone.format(task.build.buildCreatedTimestamp), modifier = Modifier.align(Alignment.BottomEnd))
+            }
         }
+
         Divider(
             modifier = Modifier
                 .height(1.dp)
@@ -166,7 +174,7 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
     task.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
         val text = AnnotatedString.Builder().apply {
             pushStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Light, color = color))
-            append("since build ${lastDifferentBuild.id} (${timeDateFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
+            append("since build ${lastDifferentBuild.id} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
         }.toAnnotatedString()
 
         ClickableText(
