@@ -131,7 +131,7 @@ fun WallboardApp() {
             GlobalScope.launch {
                 runCatching {
                     val trimmedRepo = repoTextFieldVal.trim()
-                    val repoId = if (trimmedRepo.toIntOrNull() != null) {
+                    val repoId = if (trimmedRepo.toLongOrNull() != null) {
                         trimmedRepo
                     } else {
                         Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
