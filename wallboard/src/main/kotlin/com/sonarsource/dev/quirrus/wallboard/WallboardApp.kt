@@ -131,12 +131,12 @@ fun WallboardApp() {
             GlobalScope.launch {
                 runCatching {
                     val trimmedRepo = repoTextFieldVal.trim()
-                    val repoId = if (trimmedRepo.toIntOrNull() != null) {
+                    val repoId = if (trimmedRepo.toLongOrNull() != null) {
                         trimmedRepo
                     } else {
-                        Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
+                        Common(API_CONF).resolveRepositoryId(trimmedRepo)?.also {
                             repoTextFieldVal = it
-                        }
+                        } ?: throw Exception("Could not fetch repository ID for '$trimmedRepo' (got null).")
                     }
 
                     lastTasks = processData(cirrusData.getLastPeachBuilds(repoId, branches, 15))

@@ -34,7 +34,7 @@ class LogDownloader(private val apiConfiguration: ApiConfiguration) {
                 .responseString { request, _, result ->
                     result.getOrElse { error ->
                         val errorMsg = "ERROR: Could not fetch data for '${task.name}' from ${request.url}: ${error.localizedMessage}."
-                        apiConfiguration.logger?.error(errorMsg) ?: throw ApiException(error.response, errorMsg)
+                        apiConfiguration.logger?.error(errorMsg) ?: throw ApiExceptionOld(error.response, errorMsg)
 
                         null
                     }?.let { log ->

@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.kittinunf.fuel.core.Request
+import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.Authentication.authenticateWithConfigFile
 import org.sonarsource.dev.quirrus.api.Common
@@ -24,8 +25,10 @@ abstract class CirrusCommand : GenericCirrusCommand() {
             repositoryIdOrName.toLong()
             repositoryIdOrName
         }.getOrElse {
-            Common(apiConfiguration).resolveRepositoryId(repositoryIdOrName).also {
-                logger.print { "Found ID '$it' for repository '$repositoryIdOrName'" }
+            runBlocking {
+                Common(apiConfiguration).resolveRepositoryId(repositoryIdOrName).also {
+                    logger.print { "Found ID '$it' for repository '$repositoryIdOrName'" }
+                }
             }
         }
     }

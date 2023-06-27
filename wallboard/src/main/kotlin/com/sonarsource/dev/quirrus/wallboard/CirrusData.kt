@@ -3,6 +3,7 @@ package com.sonarsource.dev.quirrus.wallboard
 import com.github.kittinunf.result.getOrElse
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.ApiException
+import org.sonarsource.dev.quirrus.api.ApiExceptionOld
 import org.sonarsource.dev.quirrus.api.LogDownloader
 
 class CirrusData(val apiConfig: ApiConfiguration) {
@@ -13,7 +14,7 @@ class CirrusData(val apiConfig: ApiConfiguration) {
             }.let { repositoryApiResponse ->
                 repositoryApiResponse.data?.repository?.builds.let {
                     if (it == null) {
-                        repositoryApiResponse.errors?.firstOrNull()?.let { e -> throw ApiException(response, e.message) }
+                        repositoryApiResponse.errors?.firstOrNull()?.let { e -> throw ApiExceptionOld(response, e.message) }
                     } else it
                 }
             }
