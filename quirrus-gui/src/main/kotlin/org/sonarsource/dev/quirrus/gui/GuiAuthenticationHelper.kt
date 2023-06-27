@@ -34,6 +34,7 @@ import javafx.concurrent.Worker
 import javafx.embed.swing.JFXPanel
 import javafx.scene.Scene
 import javafx.scene.web.WebView
+import kotlinx.coroutines.runBlocking
 import netscape.javascript.JSObject
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.Authentication
@@ -64,8 +65,10 @@ class GuiAuthenticationHelper(
             """.trimIndent()
         }
 
-        Common(apiConfiguration).fetchAuthenticatedUserId()?.let { userId ->
-            apiConfiguration.logger?.info {"Successfully authenticated as user $userId" }
+        runBlocking {
+            Common(apiConfiguration).fetchAuthenticatedUserId()
+        }?.let { userId ->
+            apiConfiguration.logger?.info { "Successfully authenticated as user $userId" }
         }
     }
 
@@ -96,8 +99,10 @@ class GuiAuthenticationHelper(
             Column {
                 Box(modifier = Modifier.background(MaterialTheme.colors.error).fillMaxWidth()) {
                     val text = AnnotatedString.Builder().apply {
-                        pushStyle(MaterialTheme.typography.body1.toSpanStyle()
-                            .copy(fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colors.onError))
+                        pushStyle(
+                            MaterialTheme.typography.body1.toSpanStyle()
+                                .copy(fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colors.onError)
+                        )
                         append("Please do not single sign-on to your organization if asked, this will not work. Simply click 'Continue' instead.")
                     }.toAnnotatedString()
 
@@ -132,7 +137,10 @@ class GuiAuthenticationHelper(
                                                     ?: return@addListener
 
 
-                                            Authentication.storeCookies(authConfigFile, "cirrusUserId=$userIdCookie; cirrusAuthToken=$tokenCookie")
+                                            Authentication.storeCookies(
+                                                authConfigFile,
+                                                "cirrusUserId=$userIdCookie; cirrusAuthToken=$tokenCookie"
+                                            )
 
                                             this@application.exitApplication()
                                         }

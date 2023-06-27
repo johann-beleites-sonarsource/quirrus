@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.path
 import org.sonarsource.dev.quirrus.CliLogger
 import java.nio.file.Path
@@ -15,10 +16,10 @@ abstract class GenericCirrusCommand : CliktCommand() {
         help = "Override the default API endpoint"
     ).default("https://api.cirrus-ci.com/graphql")
 
-    val requestTimeout: Int? by option(
+    val requestTimeout: Long? by option(
         "--request-timeout",
-        help = "Set the timeout for API requests in seconds."
-    ).int()
+        help = "Set the timeout for API requests in milliseconds."
+    ).long()
 
     val connectionRetries: Int by option(
         "--connection-retries"

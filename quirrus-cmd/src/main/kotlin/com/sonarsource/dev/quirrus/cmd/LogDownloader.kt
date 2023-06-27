@@ -7,7 +7,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
-import com.github.kittinunf.result.getOrElse
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.LogDownloader
@@ -52,26 +52,25 @@ class LogDownloader : CirrusCommand() {
     val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
 
     override fun run() {
-        val discoveredTasks = logDownloader.getLastNBuilds(repositoryId, branch, numberOfTasks).let { (req, _, result) ->
-            result.getOrElse { e ->
-                logger.error("Could not fetch last $numberOfTasks builds: $e")
-                exitProcess(1)
-            }.let { apiResponse ->
-                tasks
-                apiResponse.data?.repository?.builds?.edges?.flatMap { edge ->
-                    edge.node.let { buildNode ->
-                        buildNode.tasks.filter { task ->
-                            tasks?.contains(task.name) ?: true
-                        }.map { it to buildNode }
+        runBlocking {
+            val discoveredTasks = logDownloader.getLastNBuilds(repositoryId, branch, numberOfTasks).let { (httpResponse, apiResponse) ->
+                if (httpResponse.status == HttpStatusCode.OK) {
+                    apiResponse.data?.repository?.builds?.edges?.flatMap { edge ->
+                        edge.node.let { buildNode ->
+                            buildNode.tasks.filter { task ->
+                                tasks?.contains(task.name) ?: true
+                            }.map { it to buildNode }
+                        }
+                    } ?: run {
+                        logger.error("Got invalid response while trying to get last $numberOfTasks builds: $apiResponse")
+                        exitProcess(1)
                     }
-                } ?: run {
-                    logger.error("Got invalid response while trying to get last $numberOfTasks builds: $apiResponse")
+                } else {
+                    logger.error("Could not fetch last $numberOfTasks builds: ${httpResponse.status}")
                     exitProcess(1)
                 }
             }
-        }
 
-        runBlocking {
             logDownloader.downloadLogs((taskIds?.map { Task(it, "UNKNOWN", 0) to null } ?: emptyList()) + discoveredTasks,
                 dateFormat,
                 logFileName,

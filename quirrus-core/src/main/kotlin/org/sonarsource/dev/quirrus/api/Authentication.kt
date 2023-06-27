@@ -1,6 +1,7 @@
 package org.sonarsource.dev.quirrus.api
 
-import com.github.kittinunf.fuel.core.Request
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.header
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.readText
@@ -14,5 +15,6 @@ object Authentication {
             it.parent.createDirectories()
         }.writeText(cookies)
 
-    fun Request.authenticateWithConfigFile(credentialConfigFilePath: Path) = header("Cookie", loadCookies(credentialConfigFilePath))
+    fun HttpRequestBuilder.authenticateWithConfigFile(credentialConfigFilePath: Path) =
+        header("Cookie", loadCookies(credentialConfigFilePath))
 }

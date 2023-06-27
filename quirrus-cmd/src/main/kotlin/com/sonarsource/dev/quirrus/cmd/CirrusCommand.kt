@@ -3,7 +3,10 @@ package com.sonarsource.dev.quirrus.cmd
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
-import com.github.kittinunf.fuel.core.Request
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.header
+import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.Authentication.authenticateWithConfigFile
 import org.sonarsource.dev.quirrus.api.Common
@@ -24,8 +27,10 @@ abstract class CirrusCommand : GenericCirrusCommand() {
             repositoryIdOrName.toLong()
             repositoryIdOrName
         }.getOrElse {
-            Common(apiConfiguration).resolveRepositoryId(repositoryIdOrName).also {
-                logger.print { "Found ID '$it' for repository '$repositoryIdOrName'" }
+            runBlocking {
+                Common(apiConfiguration).resolveRepositoryId(repositoryIdOrName).also {
+                    logger.print { "Found ID '$it' for repository '$repositoryIdOrName'" }
+                }
             }
         }
     }
@@ -42,21 +47,21 @@ abstract class CirrusCommand : GenericCirrusCommand() {
                 "environment variable"
     ).default(System.getenv("CIRRUS_COOKIE") ?: "")
 
-    val authenticator: (Request) -> Request by lazy {
+    val authenticator: (HttpRequestBuilder) -> Unit by lazy {
         when {
             apiToken.isNotEmpty() -> {
                 logger.print { "Using token authentication" };
-                { request: Request -> request.header("Authorization", "Bearer $apiToken") }
+                { request: HttpRequestBuilder -> request.bearerAuth(apiToken) }
             }
 
             cookie.isNotEmpty() -> {
                 logger.print { "Using cookie authentication" };
-                { request: Request -> request.header("Cookie", cookie) }
+                { request: HttpRequestBuilder -> request.header("Cookie", cookie) }
             }
 
             credentialConfigFilePath.isRegularFile() -> {
                 logger.print { "Using credentials configured in '$credentialConfigFilePath'" };
-                { request: Request -> request.authenticateWithConfigFile(credentialConfigFilePath) }
+                { request: HttpRequestBuilder -> request.authenticateWithConfigFile(credentialConfigFilePath) }
             }
 
             else -> {
@@ -73,7 +78,7 @@ abstract class CirrusCommand : GenericCirrusCommand() {
         ApiConfiguration(
             authenticator = authenticator,
             apiUrl = apiUrl,
-            requestTimeout = requestTimeout,
+            requestTimeoutOverride = requestTimeout,
             connectionRetries = connectionRetries,
             logger = logger,
         )
