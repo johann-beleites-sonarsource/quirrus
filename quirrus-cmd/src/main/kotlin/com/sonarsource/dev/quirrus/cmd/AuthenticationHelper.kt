@@ -12,7 +12,7 @@ class AuthenticationHelper: GenericCirrusCommand() {
 
     override fun run() {
         val apiConfig = ApiConfiguration(
-            authenticator = { request -> request.authenticateWithConfigFile(credentialConfigFilePath) }
+            authenticator = { requestBuilder -> requestBuilder.authenticateWithConfigFile(credentialConfigFilePath) },
         )
 
         val helper = GuiAuthenticationHelper(apiConfig, credentialConfigFilePath)

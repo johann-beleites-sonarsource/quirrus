@@ -1,28 +1,23 @@
 package org.sonarsource.dev.quirrus
 
-import com.github.kittinunf.fuel.core.FuelError
-import com.github.kittinunf.fuel.core.Request
-import com.github.kittinunf.fuel.core.extensions.jsonBody
-import com.github.kittinunf.fuel.httpPost
-import com.github.kittinunf.fuel.serialization.responseObject
-import com.github.kittinunf.result.Result
+import io.ktor.client.call.body
+import io.ktor.client.statement.request
+import io.ktor.http.HttpStatusCode
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
-import org.sonarsource.dev.quirrus.api.json
 import kotlin.system.exitProcess
 
 class GenericWorker(private val apiConfig: ApiConfiguration) {
     private val logger by lazy { apiConfig.logger }
 
-    fun getTasksForBuild(build: Build, repositoryId: String): Pair<BuildWithMetadata, List<Task>> {
+    suspend fun getTasksForBuild(build: Build, repositoryId: String): Pair<BuildWithMetadata, List<Task>> {
         for (i in 0..apiConfig.connectionRetries) {
             sendRequestToGetTasksForBuilds(build, repositoryId)
-                .let { (request, _, result) ->
-                    when (result) {
-                        is Result.Failure -> {
-                            logger?.error("Failure getting build ${build.buildString} (Attempt ${i + 1}): ${result.error.localizedMessage}")
-                        }
-                        is Result.Success -> {
-                            if (result.get().errors == null) {
+                .let { response ->
+                    when (response.status) {
+                        HttpStatusCode.OK -> {
+                            val result = response.body<RepositoryApiResponse>()
+
+                            if (result.errors == null) {
                                 return BuildWithMetadata(
                                     getBuildId(result),
                                     getBuildDate(result),
@@ -36,11 +31,14 @@ class GenericWorker(private val apiConfig: ApiConfiguration) {
                                     }
                                 }
                             } else {
-                                logger?.error("Errors encountered while sending request to ${request.url}:")
-                                for (error in result.get().errors!!) {
+                                logger?.error("Errors encountered while sending request to ${response.request.url}:")
+                                for (error in result.errors) {
                                     logger?.error("  ${error.message}")
                                 }
                             }
+                        }
+                        else -> {
+                            logger?.error("Failure getting build ${build.buildString} (Attempt ${i + 1}): ${response.status}")
                         }
                     }
                 }
@@ -50,25 +48,17 @@ class GenericWorker(private val apiConfig: ApiConfiguration) {
         exitProcess(1)
     }
 
-    private fun sendRequestToGetTasksForBuilds(build: Build, repositoryId: String) =
-        apiConfig.apiUrl.httpPost()
-            .authenticate()
-            .let { request ->
-                apiConfig.requestTimeout?.let { request.timeout(it) } ?: request
-            }
-            .jsonBody(RequestBuilder.tasksQuery(repositoryId, build.branchName, build.buildOffset).toRequestString())
-            .responseObject<RepositoryApiResponse>(json)
+    private suspend fun sendRequestToGetTasksForBuilds(build: Build, repositoryId: String) =
+        apiConfig.post(RequestBuilder.tasksQuery(repositoryId, build.branchName, build.buildOffset))
 
 
-    private fun extractAllTasks(result: Result<RepositoryApiResponse, FuelError>) = getBuildNode(result).tasks
+    private fun extractAllTasks(result: RepositoryApiResponse) = getBuildNode(result).tasks
 
-    private fun getBuildId(result: Result<RepositoryApiResponse, FuelError>): String = getBuildNode(result).id
+    private fun getBuildId(result: RepositoryApiResponse): String = getBuildNode(result).id
 
-    private fun getBuildDate(result: Result<RepositoryApiResponse, FuelError>): Long = getBuildNode(result).buildCreatedTimestamp
+    private fun getBuildDate(result: RepositoryApiResponse): Long = getBuildNode(result).buildCreatedTimestamp
 
-    private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): BuildNode =
-        result.get().data?.repository?.builds?.edges?.let { it[it.size - 1].node }
+    private fun getBuildNode(result: RepositoryApiResponse): BuildNode =
+        result.data?.repository?.builds?.edges?.let { it[it.size - 1].node }
             ?: throw IllegalStateException("We got an empty response body - this seems wrong, we should have failed earlier.")
-
-    fun Request.authenticate(): Request = apiConfig.authenticator(this)
 }

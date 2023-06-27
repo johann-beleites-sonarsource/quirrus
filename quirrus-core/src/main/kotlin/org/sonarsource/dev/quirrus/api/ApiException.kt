@@ -1,6 +1,5 @@
 package org.sonarsource.dev.quirrus.api
 
-import com.github.kittinunf.fuel.core.Response
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.content.OutgoingContent
@@ -17,6 +16,3 @@ private fun OutgoingContent.prettyPrint() = if (this is TextContent) {
 } else {
     "UNPRINTABLE"
 }
-
-@Deprecated(message = "Use ApiException instead")
-class ApiExceptionOld(val response: Response, val errorMsg: String): Exception(errorMsg)

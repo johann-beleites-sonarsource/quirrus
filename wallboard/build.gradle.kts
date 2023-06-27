@@ -24,10 +24,6 @@ dependencies {
     val ktor_version: String by project
     implementation("io.ktor:ktor-client-core:$ktor_version")
     implementation("io.ktor:ktor-client-cio:$ktor_version")
-
-    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
-    implementation("com.github.kittinunf.fuel:fuel-kotlinx-serialization:2.3.1")
-
 }
 
 javafx {

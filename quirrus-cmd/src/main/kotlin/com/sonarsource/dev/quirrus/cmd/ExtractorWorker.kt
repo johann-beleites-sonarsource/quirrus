@@ -8,6 +8,10 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.Build
 import org.sonarsource.dev.quirrus.GenericWorker
 import org.sonarsource.dev.quirrus.Printer
@@ -45,32 +49,35 @@ class ExtractorWorker : CirrusCommand() {
         logger.debug { "Using data extraction regexes: [ ${dataExtractionRegexes.joinToString(separator = ", ") { r -> "\"$r\"" }} ]" }
 
         val collector = mutableMapOf<String, MutableMap<Build, String>>()
-        branches
-            .map { Build.ofBuild(it) }
-            .also { builds -> logger.print { "Starting for builds: ${builds.joinToString(", ")}" } }
-            .map { build -> GenericWorker(apiConfiguration).getTasksForBuild(build, repositoryId) }
-            .map { (build, tasks) ->
-                logger.print { "Fetching logs for build '$build'" }
-                build to LogDownloader(apiConfiguration).downloadLogsForTasks(tasks, logName).sortedBy { (task, _) -> task.name }
-            }
-            .let { dataList ->
-                dataExtractionRegexes.forEach { dataExtractorRegex ->
-                    dataList
-                        .map { (build, tasksWithData) ->
-                            tasksWithData.map { (task, rawData) ->
-                                dataExtractorRegex.find(rawData)?.run {
-                                    groups["data"]?.value
-                                }?.let { data ->
-                                    collector.computeIfAbsent(task.name) { mutableMapOf() }
-                                    collector[task.name]!!.put(build, data)
-                                }
-                            }
-                            build
-                        }
-                        .toList()
-                        .let { Printer.csvPrint("# regex: $dataExtractorRegex", it, collector, notFoundPlaceholder) }
+
+        runBlocking {
+            branches
+                .map { Build.ofBuild(it) }
+                .also { builds -> logger.print { "Starting for builds: ${builds.joinToString(", ")}" } }
+                .map { build -> GenericWorker(apiConfiguration).getTasksForBuild(build, repositoryId) }
+                .map { (build, tasks) ->
+                    logger.print { "Fetching logs for build '$build'" }
+                    build to LogDownloader(apiConfiguration).downloadLogsForTasks(tasks, logName).sortedBy { (task, _) -> task.name }
                 }
-            }
+                .let { dataList ->
+                    dataExtractionRegexes.forEach { dataExtractorRegex ->
+                        dataList
+                            .map { (build, tasksWithData) ->
+                                tasksWithData.map { (task, rawData) ->
+                                    dataExtractorRegex.find(rawData)?.run {
+                                        groups["data"]?.value
+                                    }?.let { data ->
+                                        collector.computeIfAbsent(task.name) { mutableMapOf() }
+                                        collector[task.name]!!.put(build, data)
+                                    }
+                                }
+                                build
+                            }
+                            .toList()
+                            .let { Printer.csvPrint("# regex: $dataExtractorRegex", it, collector, notFoundPlaceholder) }
+                    }
+                }
+        }
     }
 
     /*private fun getBuildNode(result: Result<RepositoryApiResponse, FuelError>): BuildNode =

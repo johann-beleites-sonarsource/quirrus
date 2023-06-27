@@ -27,6 +27,7 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
@@ -134,9 +135,9 @@ fun WallboardApp() {
                     val repoId = if (trimmedRepo.toLongOrNull() != null) {
                         trimmedRepo
                     } else {
-                        Common(API_CONF).resolveRepositoryId(trimmedRepo)?.also {
+                        Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
                             repoTextFieldVal = it
-                        } ?: throw Exception("Could not fetch repository ID for '$trimmedRepo' (got null).")
+                        }
                     }
 
                     lastTasks = processData(cirrusData.getLastPeachBuilds(repoId, branches, 15))

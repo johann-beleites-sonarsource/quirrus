@@ -12,8 +12,7 @@ import java.nio.file.Path
 
 val API_CONF = ApiConfiguration(
     authenticator = { request -> request.authenticateWithConfigFile(AUTH_CONF_FILE) },
-    authenticator2 = { requestBuilder -> requestBuilder.authenticateWithConfigFile(AUTH_CONF_FILE) },
-    requestTimeout = 60
+    requestTimeoutOverride = 60_000
 )
 
 val AUTH_CONF_FILE = Path.of(System.getenv("HOME"), ".quirrus", "auth.conf")

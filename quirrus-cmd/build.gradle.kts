@@ -17,10 +17,12 @@ dependencies {
     implementation("com.github.ajalt.clikt:clikt:3.4.0")
 
     // TODO: Remove //
-    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
-    implementation("com.github.kittinunf.fuel:fuel-kotlinx-serialization:2.3.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+
+    val ktor_version: String by project
+    implementation("io.ktor:ktor-client-core:$ktor_version")
+    implementation("io.ktor:ktor-client-cio:$ktor_version")
     // ------------ //
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
