@@ -22,8 +22,21 @@ private const val MIN_WINDOW_HEIGHT = 900
 
 fun main(args: Array<String>) {
     startWallboard()
+    //foo()
 }
 
+/*fun foo() = application {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Peach Wallboard",
+        state = WindowState(
+            placement = WindowPlacement.Floating,
+            size = DpSize(MIN_WINDOW_WIDTH.dp, MIN_WINDOW_HEIGHT.dp)
+        ),
+    ) {
+        Test()
+    }
+}*/
 
 fun startWallboard() = application {
     Window(
