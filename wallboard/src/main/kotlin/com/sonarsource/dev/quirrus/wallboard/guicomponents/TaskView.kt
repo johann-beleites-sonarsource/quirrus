@@ -63,7 +63,7 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
                     val backgroundColor = if (index == 0) {
                         status.color
                     } else {
-                        Color.Gray
+                        Color.LightGray
                     }
 
                     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
@@ -85,7 +85,7 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(color = MaterialTheme.colors.error.copy(alpha = 0.2f))
+                                    .background(color = backgroundColor.copy(alpha = 0.2f))
                                     .padding(top = 1.dp, bottom = 2.dp)
                             ) {
                                 val text = AnnotatedString.Builder().apply {
