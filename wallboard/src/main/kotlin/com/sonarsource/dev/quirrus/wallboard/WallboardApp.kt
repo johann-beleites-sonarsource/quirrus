@@ -147,7 +147,7 @@ fun WallboardApp() {
     var branches by remember { mutableStateOf(initialBranches) }
     var branchesTextFieldVal by remember { mutableStateOf(initialBranches.joinToString(",")) }
     var repoTextFieldVal by remember { mutableStateOf(initialRepo) }
-    var clickedIndex by remember { mutableStateOf(0) }
+    var clickPosition by remember { mutableStateOf(-1f) }
 
 
     fun reload() {
@@ -223,7 +223,7 @@ fun WallboardApp() {
                     lastTasks.keys.sorted().forEach { branch ->
                         SideTab(
                             onClick = {
-                                clickedIndex = 0
+                                clickPosition = -1f
                                 selectedTab = branch
                             },
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
@@ -278,10 +278,15 @@ fun WallboardApp() {
                                 ) {
                                     val processedData = processData(tasks)
                                     val (taskHistory, metadata) = processedData
+                                    val clickedIndex = if (clickPosition >= 0) {
+                                        taskHistory.size - (taskHistory.size.toFloat() * clickPosition).toInt() - 1
+                                    } else {
+                                        0
+                                    }
 
                                     val selectedTasks = taskHistory[clickedIndex]
                                     val amountFailed = selectedTasks.second.filter {
-                                        it.key.status == StatusCategory.FAIL
+                                        it.key.status.isFailingState()
                                     }.map {
                                         it.value.size
                                     }.sum()
@@ -305,7 +310,7 @@ fun WallboardApp() {
 
                                     Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
                                         Histogram(taskHistory, metadata, clickedIndex) {
-                                            clickedIndex = it
+                                            clickPosition = it
                                         }
                                     }
 
@@ -327,20 +332,25 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
     var maxFailed = 0
     var maxOther = 0
 
-    val buildAndTasksToReturn = history.mapIndexed { i, (build, taskMap) ->
+    val filteredHistory = history.filterIndexed { i, (_, tasks) ->
+        i == 0 || tasks.values.any { StatusCategory.ofCirrusTask(it.latestRerun) != StatusCategory.UNDECIDED }
+    }
+
+    val res = filteredHistory.mapIndexed { i, (build, taskMap) ->
         var failed = 0
         var other = 0
 
         val grouped = taskMap.values.groupBy { task ->
-            val status = StatusCategory.ofCirrusString(task.latestRerun.status)
+            val status = StatusCategory.ofCirrusTask(task.latestRerun)
 
-            when (status) {
-                StatusCategory.FAIL -> failed++
+            when {
+                status.isFailingState() -> failed++
                 else -> other++
             }
 
             val isNewStatus =
-                i < (history.size - 1) && history[i + 1].second[task.latestRerun.name]?.latestRerun?.status != task.latestRerun.status
+                i < (filteredHistory.size - 1) && filteredHistory[i + 1].second[task.latestRerun.name]?.latestRerun?.status != task.latestRerun.status
+
             Status(status, isNewStatus)
         }
 
@@ -350,7 +360,7 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
         build to grouped
     }
 
-    return buildAndTasksToReturn to MetaData(maxFailed, maxOther)
+    return res to MetaData(maxFailed, maxOther)
 }
 
 data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Status> {
@@ -358,12 +368,14 @@ data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Sta
         private fun StatusCategory.toInt() = when (this) {
             StatusCategory.SUCCESS -> 2
             StatusCategory.UNDECIDED -> 4
-            StatusCategory.FAIL -> 6
+            StatusCategory.FAIL_SOFT -> 6
+            StatusCategory.FAIL_HARD -> 8
         }
     }
 
     val color: Color = when (status) {
-        StatusCategory.FAIL -> Color.Red
+        StatusCategory.FAIL_HARD -> Color.Red
+        StatusCategory.FAIL_SOFT -> Color.Yellow
         StatusCategory.SUCCESS -> Color.Green
         StatusCategory.UNDECIDED -> Color.Gray
     }.let {
@@ -381,14 +393,22 @@ data class MetaData(val maxFailed: Int, val maxOther: Int) {
 }
 
 enum class StatusCategory {
-    SUCCESS, FAIL, UNDECIDED;
+    SUCCESS, FAIL_HARD, FAIL_SOFT, UNDECIDED;
 
     companion object {
-        fun ofCirrusString(statusString: String) = when (statusString) {
+        fun ofCirrusTask(task: Task) = when (task.status) {
             "COMPLETED" -> SUCCESS
-            "ABORTED", "FAILED" -> FAIL
+            "ABORTED", "FAILED" -> {
+                if (task.firstFailedCommand?.name?.contains("analyze") == true) {
+                    FAIL_HARD
+                } else {
+                    FAIL_SOFT
+                }
+            }
             "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING", "SKIPPED", "PAUSED" -> UNDECIDED
-            else -> throw Exception("Unknown task status ${statusString}")
+            else -> throw Exception("Unknown task status ${task.status}")
         }
     }
+
+    fun isFailingState() = this == FAIL_HARD || this == FAIL_SOFT
 }

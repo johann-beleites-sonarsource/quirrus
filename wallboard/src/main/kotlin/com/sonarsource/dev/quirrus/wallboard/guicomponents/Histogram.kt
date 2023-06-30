@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -24,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.MetaData
 import com.sonarsource.dev.quirrus.wallboard.Status
-import com.sonarsource.dev.quirrus.wallboard.StatusCategory
 import org.jetbrains.skia.Font
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.TextLine
@@ -38,18 +39,24 @@ val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun Histogram(taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>, metadata: MetaData, selectItem: Int, updateSelectedIndex: (Int) -> Unit) {
+fun Histogram(
+    taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>,
+    metadata: MetaData,
+    selectItem: Int,
+    updateClickIndexFraction: (Float) -> Unit
+) {
 
     val interactionSource = remember { MutableInteractionSource() }
 
     val hoverable = Modifier.hoverable(interactionSource = interactionSource)
     val isHoveredOver by interactionSource.collectIsHoveredAsState()
     val bgColor = if (isHoveredOver) Color.Gray else Color.LightGray
-    var performSelectIndexCalculation: (Float) -> Unit = {}
+    var slotPerBar by remember { mutableStateOf(0f) }
+    var maxX by remember { mutableStateOf(0f) }
 
     val pointerInput = Modifier.pointerInput(Unit) {
         detectTapGestures { offset: Offset ->
-            performSelectIndexCalculation(offset.x)
+            updateClickIndexFraction(offset.x / maxX)
         }
     }
 
@@ -60,19 +67,14 @@ fun Histogram(taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<En
         Canvas(
             modifier = Modifier.fillMaxSize()/*.then(hoverable)*/.then(pointerInput).pointerHoverIcon(PointerIconDefaults.Hand)
         ) {
-            val maxX = size.width
+            maxX = size.width
             val maxY = size.height - 20f
 
             val stepHeight = (maxY) / metadata.total.toFloat()
             val zeroYOffset = stepHeight * metadata.maxFailed.toFloat() + 5f
 
-            val slotPerBar = maxX / taskHistoryWithBuildNode.size.toFloat()
+            slotPerBar = maxX / taskHistoryWithBuildNode.size.toFloat()
             val barWidth = slotPerBar - (2 * barPadding)
-
-            performSelectIndexCalculation = { clickPosition ->
-                val newPosition = taskHistoryWithBuildNode.size - (clickPosition / slotPerBar).toInt() - 1
-                if (newPosition in taskHistoryWithBuildNode.indices) updateSelectedIndex(newPosition)
-            }
 
             drawRect(
                 color = Color.DarkGray,
@@ -102,8 +104,8 @@ fun Histogram(taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<En
             taskHistoryWithBuildNode.forEachIndexed { i, (buildNode, categorizedTasks) ->
                 categorizedTasks.map { (status, tasks) ->
                     status to tasks.count()
-                }.partition { (status, count) ->
-                    status.status == StatusCategory.FAIL
+                }.partition { (status, _) ->
+                    status.status.isFailingState()
                 }.let { (failed, other) ->
                     failed.sortedBy { (status, _) -> status } to
                             other.sortedBy { (status, _) -> status }
