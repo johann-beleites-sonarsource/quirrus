@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.MetaData
 import com.sonarsource.dev.quirrus.wallboard.Status
+import com.sonarsource.dev.quirrus.wallboard.StatusCategory
 import org.jetbrains.skia.Font
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.TextLine
@@ -70,10 +71,30 @@ fun Histogram(
             maxX = size.width
             val maxY = size.height - 20f
 
-            val stepHeight = (maxY) / metadata.total.toFloat()
-            val zeroYOffset = stepHeight * metadata.maxFailed.toFloat() + 5f
+            val filteredTaskHistoryWithBuildNode = taskHistoryWithBuildNode.map { (buildNode, categorizedTasks) ->
+                buildNode to categorizedTasks.filter { (status, _) ->
+                    status.new || status.status != StatusCategory.SUCCESS
+                }
+            }
 
-            slotPerBar = maxX / taskHistoryWithBuildNode.size.toFloat()
+            val maxFailed = filteredTaskHistoryWithBuildNode.maxOf { (buildNode, tasks) ->
+                tasks.filter { (status, _) ->
+                    status.status.isFailingState()
+                }.values.sumOf { it.size }
+            }
+
+            val maxNotFailed = filteredTaskHistoryWithBuildNode.maxOf { (buildNode, tasks) ->
+                tasks.filter { (status, _) ->
+                    !status.status.isFailingState() && !(status.status == StatusCategory.SUCCESS && !status.new)
+                }.values.sumOf { it.size }
+            }
+
+            val total = maxFailed + maxNotFailed
+
+            val stepHeight = (maxY) / total.toFloat()
+            val zeroYOffset = stepHeight * maxFailed.toFloat() + 5f
+
+            slotPerBar = maxX / filteredTaskHistoryWithBuildNode.size.toFloat()
             val barWidth = slotPerBar - (2 * barPadding)
 
             drawRect(
@@ -101,7 +122,7 @@ fun Histogram(
             var left = maxX - barWidth - barPadding
             var i = 0
 
-            taskHistoryWithBuildNode.forEachIndexed { i, (buildNode, categorizedTasks) ->
+            filteredTaskHistoryWithBuildNode.forEachIndexed { i, (buildNode, categorizedTasks) ->
                 categorizedTasks.map { (status, tasks) ->
                     status to tasks.count()
                 }.partition { (status, _) ->
