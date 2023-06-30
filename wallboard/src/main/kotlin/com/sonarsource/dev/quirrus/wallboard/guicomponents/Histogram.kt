@@ -98,7 +98,7 @@ fun Histogram(
             val barWidth = slotPerBar - (2 * barPadding)
 
             drawRect(
-                color = Color.DarkGray,
+                color = Color.Gray.copy(alpha = 0.3f),
                 topLeft = Offset(x = maxX - ((barWidth + (2 * barPadding)) * (selectItem + 1)), y = 0f),
                 size = Size(width = slotPerBar, height = maxY),
             )
