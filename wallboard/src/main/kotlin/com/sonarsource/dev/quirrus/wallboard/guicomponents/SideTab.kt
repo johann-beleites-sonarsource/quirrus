@@ -1,11 +1,11 @@
 package com.sonarsource.dev.quirrus.wallboard.guicomponents
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SideTab(onClick: () -> Unit, text: String, bgColor: Color) {
+fun SideTab(onClick: () -> Unit, text: String, bgColor: Color, selected: Boolean) {
     Button(
         onClick = onClick,
         modifier = Modifier
@@ -27,8 +27,9 @@ fun SideTab(onClick: () -> Unit, text: String, bgColor: Color) {
             .padding(bottom = 1.dp),
         colors = ButtonDefaults.buttonColors(
             backgroundColor = bgColor,
-            contentColor = MaterialTheme.colors.onPrimary
+            contentColor = Color.Black
         ),
+        border = BorderStroke(width = if (selected) 5.dp else 0.dp, color = Color.Black)
     ) {
         Text(text)
     }

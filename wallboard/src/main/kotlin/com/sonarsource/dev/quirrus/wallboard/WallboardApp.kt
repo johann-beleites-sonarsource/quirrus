@@ -143,6 +143,10 @@ fun WallboardApp() {
     var error by remember { mutableStateOf("Unknown") }
     //var lastTasks by remember { mutableStateOf(emptyMap<String, SortedTasks?>()) }
     var lastTasks by remember { mutableStateOf(emptyMap<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>()) }
+    var dataByBranch = lastTasks.mapNotNull { (branch, tasks) ->
+        if (tasks == null) null
+        else branch to processData(tasks)
+    }.toMap()
     var selectedTab: String? by remember { mutableStateOf(null) }
     var branches by remember { mutableStateOf(initialBranches) }
     var branchesTextFieldVal by remember { mutableStateOf(initialBranches.joinToString(",")) }
@@ -227,8 +231,10 @@ fun WallboardApp() {
                                 selectedTab = branch
                             },
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
-                            text = "$branch",
-                            bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
+                            text = branch,
+                            //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
+                            bgColor = (dataByBranch[branch]?.first?.firstOrNull()?.second?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
+                            selected = branch == selectedTab
                         )
                     }
 
@@ -270,14 +276,12 @@ fun WallboardApp() {
                         when (state) {
                             AppState.LOADING -> LoadingScreen()
                             AppState.ERROR -> ErrorScreen(error)
-                            else -> lastTasks.get(selectedTab)?.let { tasks ->
+                            else -> dataByBranch[selectedTab]?.let { (taskHistory, metadata) ->
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(5.dp)
                                 ) {
-                                    val processedData = processData(tasks)
-                                    val (taskHistory, metadata) = processedData
                                     val clickedIndex = if (clickPosition >= 0) {
                                         taskHistory.size - (taskHistory.size.toFloat() * clickPosition).toInt() - 1
                                     } else {
@@ -405,6 +409,7 @@ enum class StatusCategory {
                     FAIL_SOFT
                 }
             }
+
             "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING", "SKIPPED", "PAUSED" -> UNDECIDED
             else -> throw Exception("Unknown task status ${task.status}")
         }
