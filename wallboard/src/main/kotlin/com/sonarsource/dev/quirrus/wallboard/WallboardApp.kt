@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Icon
@@ -33,6 +34,7 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
@@ -83,9 +85,9 @@ private fun processData(builds: Map<String, Builds?>) =
         }.mapIndexed { buildIndex, buildNode ->
             buildNode to buildNode.tasks.groupBy { task ->
                 task.name
-            }.map { (name, tasks) ->
+            }.map { (name, reruns) ->
                 // We set the last build with different status later.
-                name to EnrichedTask(tasks, buildNode, null)
+                name to EnrichedTask(reruns.sortedByDescending { it.creationTimestamp }, buildNode, null)
             }.toMap()
         }
 
@@ -133,13 +135,73 @@ data class EnrichedTask(val taskReruns: List<Task>, val build: BuildNode, var la
 data class SortedTasks(val completed: List<EnrichedTask>, val failed: List<EnrichedTask>)
 
 private enum class AppState {
-    LOADING, ERROR, NONE
+    LOADING, ERROR, NONE, INIT
+}
+
+private fun reload(
+    currentState: AppState,
+    repoTextFieldVal: String,
+    branches: List<String>,
+    selectedTab: String?,
+    setState: (AppState) -> Unit,
+    setError: (String) -> Unit,
+    setRepoTextFieldVal: (String) -> Unit,
+    setLastTasks: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit,
+    setSelectedTab: (String) -> Unit,
+) {
+    if (currentState != AppState.LOADING) {
+        if (repoTextFieldVal.isBlank()) {
+            setError("The $CIRRUS_REPO_TEXT_FIELD_LABEL is required.")
+            setState(AppState.ERROR)
+            return
+        } else if (branches.isEmpty()) {
+            setError("You need to provide at least 1 branch to fetch data for.")
+            setState(AppState.ERROR)
+            return
+        }
+
+        setState(AppState.LOADING)
+
+        configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal")
+
+        GlobalScope.launch {
+            runCatching {
+                val trimmedRepo = repoTextFieldVal.trim()
+                val repoId = if (trimmedRepo.toLongOrNull() != null) {
+                    trimmedRepo
+                } else {
+                    Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
+                        setRepoTextFieldVal(it)
+                    }
+                }
+
+                processData(cirrusData.getLastPeachBuilds(repoId, branches, 15)).also {
+                    setLastTasks(it)
+                }
+            }.onFailure { e ->
+                val error = e.stackTraceToString()
+                setError(error)
+
+                if (e is NoSuchFileException || e is java.nio.file.NoSuchFileException) {
+                    setError("Have you tried authenticating?\n\n$error")
+                }
+
+                setState(AppState.ERROR)
+                e.printStackTrace(System.err)
+            }.onSuccess { lastTasks ->
+                if (selectedTab == null) {
+                    setSelectedTab(lastTasks.keys.minOf { it })
+                }
+                setState(AppState.NONE)
+            }
+        }
+    }
 }
 
 @Composable
 @Preview
 fun WallboardApp() {
-    var state by remember { mutableStateOf(AppState.NONE) }
+    var state by remember { mutableStateOf(AppState.INIT) }
     var error by remember { mutableStateOf("Unknown") }
     //var lastTasks by remember { mutableStateOf(emptyMap<String, SortedTasks?>()) }
     var lastTasks by remember { mutableStateOf(emptyMap<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>()) }
@@ -152,59 +214,24 @@ fun WallboardApp() {
     var branchesTextFieldVal by remember { mutableStateOf(initialBranches.joinToString(",")) }
     var repoTextFieldVal by remember { mutableStateOf(initialRepo) }
     var clickPosition by remember { mutableStateOf(-1f) }
+    val taskListScrollState = rememberScrollState(0)
 
-
-    fun reload() {
-        if (state != AppState.LOADING) {
-            if (repoTextFieldVal.isBlank()) {
-                error = "The $CIRRUS_REPO_TEXT_FIELD_LABEL is required."
-                state = AppState.ERROR
-                return
-            } else if (branches.isEmpty()) {
-                error = "You need to provide at least 1 branch to fetch data for."
-                state = AppState.ERROR
-                return
-            }
-
-            state = AppState.LOADING
-
-            configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal")
-
-            GlobalScope.launch {
-                runCatching {
-                    val trimmedRepo = repoTextFieldVal.trim()
-                    val repoId = if (trimmedRepo.toLongOrNull() != null) {
-                        trimmedRepo
-                    } else {
-                        Common(API_CONF).resolveRepositoryId(trimmedRepo).also {
-                            repoTextFieldVal = it
-                        }
-                    }
-
-                    lastTasks = processData(cirrusData.getLastPeachBuilds(repoId, branches, 15))
-                }.onFailure { e ->
-                    error = e.stackTraceToString()
-
-                    if (e is NoSuchFileException || e is java.nio.file.NoSuchFileException) {
-                        error = "Have you tried authenticating?\n\n$error"
-                    }
-
-                    state = AppState.ERROR
-                    e.printStackTrace(System.err)
-                }.onSuccess {
-                    if (selectedTab == null) {
-                        selectedTab = lastTasks.keys.minOf { it }
-                    }
-                    state = AppState.NONE
-                }
-            }
-        }
-    }
+    fun triggerReload() = reload(
+        state,
+        repoTextFieldVal,
+        branches,
+        selectedTab,
+        { state = it },
+        { error = it },
+        { repoTextFieldVal = it },
+        { lastTasks = it },
+        { selectedTab = it }
+    )
 
     fun authenticate() {
         GlobalScope.launch {
             GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
-            reload()
+            triggerReload()
         }
     }
 
@@ -228,6 +255,7 @@ fun WallboardApp() {
                         SideTab(
                             onClick = {
                                 clickPosition = -1f
+                                GlobalScope.launch { taskListScrollState.scrollTo(0) }
                                 selectedTab = branch
                             },
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
@@ -248,7 +276,7 @@ fun WallboardApp() {
                     )
 
                     Button(
-                        onClick = ::reload,
+                        onClick = ::triggerReload,
                         enabled = state != AppState.LOADING,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         colors = ButtonDefaults.buttonColors(
@@ -276,6 +304,7 @@ fun WallboardApp() {
                         when (state) {
                             AppState.LOADING -> LoadingScreen()
                             AppState.ERROR -> ErrorScreen(error)
+                            AppState.INIT -> triggerReload()
                             else -> dataByBranch[selectedTab]?.let { (taskHistory, metadata) ->
                                 Column(
                                     modifier = Modifier
@@ -319,7 +348,7 @@ fun WallboardApp() {
                                     }
 
                                     Row(modifier = Modifier.weight(0.6f)) {
-                                        TaskList(selectedTasks)
+                                        TaskList(selectedTasks, taskListScrollState)
                                     }
                                 }
                             }
@@ -352,8 +381,9 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
                 else -> other++
             }
 
-            val isNewStatus =
-                i < (filteredHistory.size - 1) && filteredHistory[i + 1].second[task.latestRerun.name]?.latestRerun?.status != task.latestRerun.status
+            val isNewStatus = filteredHistory.getOrNull(i + 1)?.second?.get(task.latestRerun.name)?.latestRerun?.let { lastRun ->
+                lastRun.status != task.latestRerun.status || StatusCategory.ofCirrusTask(lastRun) != status
+            } ?: (i < filteredHistory.size - 1)
 
             Status(status, isNewStatus)
         }

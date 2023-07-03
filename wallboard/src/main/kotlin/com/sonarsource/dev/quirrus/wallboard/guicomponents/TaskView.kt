@@ -1,5 +1,6 @@
 package com.sonarsource.dev.quirrus.wallboard.guicomponents
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -7,11 +8,13 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +41,8 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
+fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, verticalScrollState: ScrollState) {
     val (_, tasks) = buildNodeTasks
-
-    val verticalScrollState = rememberScrollState(0)
 
     val (completed, failed) = tasks.entries
         .flatMap { (status, tasks) ->
@@ -63,25 +64,28 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
                     val backgroundColor = if (index == 0) {
                         status.color
                     } else {
-                        Color.LightGray
+                        Color.LightGray.copy(alpha = 0.5f)
                     }
 
                     Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
                         Column {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(backgroundColor)
-                                    .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
-                            ) {
-                                Text(
-                                    task.name,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = Color.Black//MaterialTheme.colors.onError
-                                )
+                            if (index == 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(backgroundColor)
+                                        .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
+                                ) {
+                                    Text(
+                                        task.name,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = Color.Black//MaterialTheme.colors.onError
+                                    )
 
-                                SinceText(enrichedTask, Color.Black/*MaterialTheme.colors.onError*/)
+                                    SinceText(enrichedTask, Color.Black/*MaterialTheme.colors.onError*/)
+                                }
                             }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -93,7 +97,7 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
                                         MaterialTheme.typography.body2.toSpanStyle()
                                             .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
                                     )
-                                    append(task.firstFailedCommand?.name ?: "???")
+                                    append(task.firstFailedCommand?.name ?: "")
 
                                     pushStyle(
                                         MaterialTheme.typography.body2.toSpanStyle()
