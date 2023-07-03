@@ -261,7 +261,7 @@ fun WallboardApp() {
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
                             text = branch,
                             //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
-                            bgColor = (dataByBranch[branch]?.first?.firstOrNull()?.second?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
+                            bgColor = (dataByBranch[branch]?.firstOrNull()?.second?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
                             selected = branch == selectedTab
                         )
                     }
@@ -305,7 +305,7 @@ fun WallboardApp() {
                             AppState.LOADING -> LoadingScreen()
                             AppState.ERROR -> ErrorScreen(error)
                             AppState.INIT -> triggerReload()
-                            else -> dataByBranch[selectedTab]?.let { (taskHistory, metadata) ->
+                            else -> dataByBranch[selectedTab]?.let { taskHistory ->
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -342,7 +342,7 @@ fun WallboardApp() {
                                     )
 
                                     Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
-                                        Histogram(taskHistory, metadata, clickedIndex) {
+                                        Histogram(taskHistory, clickedIndex) {
                                             clickPosition = it
                                         }
                                     }
@@ -360,7 +360,7 @@ fun WallboardApp() {
     }
 }
 
-private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>>): Pair<List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>, MetaData> {
+private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>>): List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>> {
 
     var maxFailed = 0
     var maxOther = 0
@@ -369,7 +369,7 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
         i == 0 || tasks.values.any { StatusCategory.ofCirrusTask(it.latestRerun) != StatusCategory.UNDECIDED }
     }
 
-    val res = filteredHistory.mapIndexed { i, (build, taskMap) ->
+    return filteredHistory.mapIndexed { i, (build, taskMap) ->
         var failed = 0
         var other = 0
 
@@ -393,8 +393,6 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
 
         build to grouped
     }
-
-    return res to MetaData(maxFailed, maxOther)
 }
 
 data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Status> {
@@ -420,10 +418,6 @@ data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Sta
 
     private fun toInt() = status.toInt().let { if (!new) it - 1 else it }
     override fun compareTo(other: Status) = toInt() - other.toInt()
-}
-
-data class MetaData(val maxFailed: Int, val maxOther: Int) {
-    val total = maxFailed + maxOther
 }
 
 enum class StatusCategory {

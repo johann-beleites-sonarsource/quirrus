@@ -24,7 +24,6 @@ import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
-import com.sonarsource.dev.quirrus.wallboard.MetaData
 import com.sonarsource.dev.quirrus.wallboard.Status
 import com.sonarsource.dev.quirrus.wallboard.StatusCategory
 import org.jetbrains.skia.Font
@@ -42,7 +41,6 @@ val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
 @Composable
 fun Histogram(
     taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>,
-    metadata: MetaData,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {
