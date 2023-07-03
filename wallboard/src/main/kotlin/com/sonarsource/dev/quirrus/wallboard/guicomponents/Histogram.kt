@@ -24,7 +24,6 @@ import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
-import com.sonarsource.dev.quirrus.wallboard.MetaData
 import com.sonarsource.dev.quirrus.wallboard.Status
 import com.sonarsource.dev.quirrus.wallboard.StatusCategory
 import org.jetbrains.skia.Font
@@ -36,13 +35,13 @@ import java.util.Date
 
 val barPadding = 5f
 
-val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
+val dateOnly = SimpleDateFormat("yy-MM-dd")
+val timeOnly = SimpleDateFormat("HH:mm")
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun Histogram(
     taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>,
-    metadata: MetaData,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {
@@ -154,11 +153,9 @@ fun Histogram(
                         top + height
                     }
 
-                    drawText(dateFormat.format(Date(buildNode.buildCreatedTimestamp)), left, maxY + 17f)
-                    /*
-                                        drawContext.canvas.nativeCanvas.apply {
-                                            drawTextLine(TextLine.make("foo", Font()), 0f, 0f, Paint())
-                                        }*/
+                    val creationDate = Date(buildNode.buildCreatedTimestamp)
+                    drawText(dateOnly.format(creationDate), left, maxY + 2f)
+                    drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
             }
 
