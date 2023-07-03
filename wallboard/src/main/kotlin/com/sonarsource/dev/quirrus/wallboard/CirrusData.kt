@@ -26,7 +26,7 @@ class CirrusData(val apiConfig: ApiConfiguration) {
                     getLastPeachBuilds(repo, branch, numberOfBuilds)
                 }
             }
-        }.map { (k, deferred) ->
-            k to deferred.await()
+        }.map { (branch, deferred) ->
+            branch to deferred.await()
         }.toMap()
 }

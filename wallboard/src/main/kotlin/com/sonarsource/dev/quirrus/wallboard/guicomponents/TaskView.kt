@@ -6,15 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +25,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
+import com.sonarsource.dev.quirrus.wallboard.Status
+import com.sonarsource.dev.quirrus.wallboard.StatusCategory
+import org.sonarsource.dev.quirrus.BuildNode
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -35,136 +35,116 @@ import java.util.*
 
 
 private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefault())
-private val dateTimeFormatWithTimezone = SimpleDateFormat("dd.MM.yyy HH:mm Z", Locale.getDefault())
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TaskList(title: String, completed: List<EnrichedTask>, failed: List<EnrichedTask>) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(5.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>) {
+    val (_, tasks) = buildNodeTasks
 
-            AnnotatedString.Builder().apply {
-                pushStyle(MaterialTheme.typography.h4.toSpanStyle())
-                append("$title ")
+    val verticalScrollState = rememberScrollState(0)
 
-                pushStyle(MaterialTheme.typography.h5.toSpanStyle())
-                append("(${failed.size} failed | ${completed.size} completed | ${completed.size + failed.size} total)")
-            }.toAnnotatedString().let {
-                Text(it)
-            }
-
-            completed.firstOrNull()?.let { task ->
-                Text(dateTimeFormatWithTimezone.format(task.build.buildCreatedTimestamp), modifier = Modifier.align(Alignment.BottomEnd))
-            }
+    val (completed, failed) = tasks.entries
+        .flatMap { (status, tasks) ->
+            tasks.map { status to it }
+                .sortedBy { (_, task) ->
+                    task.latestRerun.name
+                }
+        }.partition { (status, _) ->
+            status.status == StatusCategory.SUCCESS
+        }.let { (first, second) ->
+            first.sortedByDescending { it.first } to second.sortedByDescending { it.first }
         }
 
-        Divider(
-            modifier = Modifier
-                .height(1.dp)
-                .fillMaxWidth()
-                .background(color = MaterialTheme.colors.primary)
-                .padding(bottom = 5.dp)
-        )
+    Box {
+        Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
+            //items(failed) { task ->
+            for ((status, enrichedTask) in failed) {
+                enrichedTask.taskReruns.forEachIndexed { index, task ->
+                    val backgroundColor = if (index == 0) {
+                        status.color
+                    } else {
+                        Color.LightGray
+                    }
 
-        val verticalScrollState = rememberScrollState(0)
+                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
+                        Column {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(backgroundColor)
+                                    .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
+                            ) {
+                                Text(
+                                    task.name,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color.Black//MaterialTheme.colors.onError
+                                )
 
-        Box {
-            Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
-                //items(failed) { task ->
-                for (enrichedTask in failed) {
-                    enrichedTask.tasks.forEachIndexed { index, task ->
-                        val backgroundColor = with(
-                            if (completed.any { it.tasks.first().name == task.name }) MaterialTheme.colors.secondary
-                            else MaterialTheme.colors.error
-                        ) {
-                            if (index > 0) copy(alpha = 0.4f)
-                            else this
-                        }
-
-                        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
-                            Column {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(backgroundColor)
-                                        .padding(top = 5.dp, start = 5.dp, end = 5.dp, bottom = 1.dp)
-                                ) {
-                                    Text(
-                                        task.name,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        color = MaterialTheme.colors.onError
+                                SinceText(enrichedTask, Color.Black/*MaterialTheme.colors.onError*/)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(color = backgroundColor.copy(alpha = 0.2f))
+                                    .padding(top = 1.dp, bottom = 2.dp)
+                            ) {
+                                val text = AnnotatedString.Builder().apply {
+                                    pushStyle(
+                                        MaterialTheme.typography.body2.toSpanStyle()
+                                            .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
                                     )
+                                    append(task.firstFailedCommand?.name ?: "???")
 
-                                    SinceText(enrichedTask, MaterialTheme.colors.onError)
-                                }
-                                Box(
+                                    pushStyle(
+                                        MaterialTheme.typography.body2.toSpanStyle()
+                                            .copy(fontWeight = FontWeight.Light, color = MaterialTheme.colors.onBackground)
+                                    )
+                                    append(" ${task.status}")
+
+                                    task.firstFailedCommand?.durationInSeconds?.let { duration ->
+                                        pushStyle(
+                                            MaterialTheme.typography.body2.toSpanStyle()
+                                                .copy(color = MaterialTheme.colors.onBackground)
+                                        )
+                                        append(" after $duration s")
+                                    }
+                                }.toAnnotatedString()
+
+                                ClickableText(
+                                    text,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(color = MaterialTheme.colors.error.copy(alpha = 0.2f))
-                                        .padding(top = 1.dp, bottom = 2.dp)
+                                        .padding(start = 20.dp)
+                                        .pointerHoverIcon(PointerIconDefaults.Hand),
                                 ) {
-                                    val text = AnnotatedString.Builder().apply {
-                                        pushStyle(
-                                            MaterialTheme.typography.body2.toSpanStyle()
-                                                .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
-                                        )
-                                        append(task.firstFailedCommand?.name ?: "???")
-
-                                        pushStyle(
-                                            MaterialTheme.typography.body2.toSpanStyle()
-                                                .copy(fontWeight = FontWeight.Light, color = MaterialTheme.colors.onBackground)
-                                        )
-                                        append(" ${task.status}")
-
-                                        task.firstFailedCommand?.durationInSeconds?.let { duration ->
-                                            pushStyle(
-                                                MaterialTheme.typography.body2.toSpanStyle()
-                                                    .copy(color = MaterialTheme.colors.onBackground)
-                                            )
-                                            append(" after $duration s")
-                                        }
-                                    }.toAnnotatedString()
-
-                                    ClickableText(
-                                        text,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 20.dp)
-                                            .pointerHoverIcon(PointerIconDefaults.Hand),
-                                    ) {
-                                        openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
-                                    }
+                                    openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
                                 }
                             }
                         }
                     }
                 }
-
-                for (task in completed) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
-                        Text(
-                            task.tasks.last().name,
-                            modifier = Modifier
-                                .background(color = MaterialTheme.colors.secondary)
-                                .padding(all = 5.dp)
-                                .fillMaxWidth(),
-                            color = MaterialTheme.colors.onSecondary
-                        )
-
-                        SinceText(task, MaterialTheme.colors.onSecondary)
-                    }
-                }
             }
 
-            VerticalScrollbar(
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                adapter = rememberScrollbarAdapter(scrollState = verticalScrollState)
-            )
+            for ((status, task) in completed) {
+                Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
+                    Text(
+                        task.latestRerun.name,
+                        modifier = Modifier
+                            .background(color = status.color)
+                            .padding(all = 5.dp)
+                            .fillMaxWidth(),
+                        color = MaterialTheme.colors.onSecondary
+                    )
+
+                    SinceText(task, MaterialTheme.colors.onSecondary)
+                }
+            }
         }
+
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            adapter = rememberScrollbarAdapter(scrollState = verticalScrollState)
+        )
     }
 }
 
@@ -183,7 +163,7 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
                 .align(Alignment.CenterEnd)
                 .pointerHoverIcon(PointerIconDefaults.Hand),
         ) {
-            task.lastBuildWithDifferentStatus.tasks.firstOrNull { it.name == task.tasks.first().name }?.let { task ->
+            lastDifferentBuild.tasks.firstOrNull { it.name == task.taskReruns.first().name }?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
             }
         }
