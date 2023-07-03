@@ -35,7 +35,8 @@ import java.util.Date
 
 val barPadding = 5f
 
-val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm")
+val dateOnly = SimpleDateFormat("yy-MM-dd")
+val timeOnly = SimpleDateFormat("HH:mm")
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -152,11 +153,9 @@ fun Histogram(
                         top + height
                     }
 
-                    drawText(dateFormat.format(Date(buildNode.buildCreatedTimestamp)), left, maxY + 17f)
-                    /*
-                                        drawContext.canvas.nativeCanvas.apply {
-                                            drawTextLine(TextLine.make("foo", Font()), 0f, 0f, Paint())
-                                        }*/
+                    val creationDate = Date(buildNode.buildCreatedTimestamp)
+                    drawText(dateOnly.format(creationDate), left, maxY + 2f)
+                    drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
             }
 
