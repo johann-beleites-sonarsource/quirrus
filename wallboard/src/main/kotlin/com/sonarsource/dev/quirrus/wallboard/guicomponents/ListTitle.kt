@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.Divider
+import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +21,14 @@ import java.util.Locale
 private val dateTimeFormatWithTimezone = SimpleDateFormat("dd.MM.yyy HH:mm Z", Locale.getDefault())
 
 @Composable
-fun ListTitle(title: String, numberCompleted: Int, numberFailed: Int, totalNumber: Int, buildCreatedTimestamp: Long) {
+fun ListTitle(
+    title: String,
+    numberCompleted: Int,
+    numberFailed: Int,
+    totalNumber: Int,
+    buildCreatedTimestamp: Long,
+    backgroundRefreshInProgress: Boolean
+) {
     Box(modifier = Modifier.fillMaxWidth()) {
 
         AnnotatedString.Builder().apply {
@@ -32,6 +41,7 @@ fun ListTitle(title: String, numberCompleted: Int, numberFailed: Int, totalNumbe
             Text(it)
         }
 
+        if (backgroundRefreshInProgress) LinearProgressIndicator(Modifier.align(Alignment.TopEnd).width(100.dp))
         Text(dateTimeFormatWithTimezone.format(buildCreatedTimestamp), modifier = Modifier.align(Alignment.BottomEnd))
     }
 
