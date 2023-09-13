@@ -1,11 +1,16 @@
 package com.sonarsource.dev.quirrus.wallboard
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.ClickableText
@@ -13,6 +18,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Checkbox
 import androidx.compose.material.Icon
+import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
@@ -25,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.runtime.toMutableStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -215,7 +220,8 @@ fun launchBackgroundRefreshPoll(
     getCurrentRunId: () -> Long,
     branch: String,
     repoTextFieldVal: String,
-    setResult: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit
+    setBackgroundLoadingInProgress: (Boolean) -> Unit,
+    setResult: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit,
 ) = GlobalScope.launch {
     val trimmedRepo = repoTextFieldVal.trim()
     val repoId = if (trimmedRepo.toLongOrNull() != null) {
@@ -224,19 +230,17 @@ fun launchBackgroundRefreshPoll(
         return@launch
     }
 
-    println("Background refresh [$runId]: Starting for branch '$branch'...")
 
     while (getCurrentRunId() <= runId) {
+        setBackgroundLoadingInProgress(true)
         processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 15)).also {
             if (getCurrentRunId() == runId) {
-                println("Background refresh [$runId]: got new data for ${it.keys}")
                 setResult(it)
+                setBackgroundLoadingInProgress(false)
             }
         }
         delay(10_000)
     }
-
-    println("Background refresh [$runId]: cancelled [${getCurrentRunId()}].")
 }
 
 
@@ -260,6 +264,7 @@ fun WallboardApp() {
     var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
     var lastSelectedTab: String? by remember { mutableStateOf(null) }
+    var backgroundLoadingInProgress by remember { mutableStateOf(false) }
 
     fun saveConfig() {
         writeConfig(branches, repoTextFieldVal, autoRefresh)
@@ -287,7 +292,13 @@ fun WallboardApp() {
 
     fun startBackgroundRefreshPoll() {
         val branch = selectedTab ?: return
-        launchBackgroundRefreshPoll(backgroundRefreshCounter, { backgroundRefreshCounter }, branch, repoTextFieldVal) {
+        launchBackgroundRefreshPoll(
+            backgroundRefreshCounter,
+            { backgroundRefreshCounter },
+            branch,
+            repoTextFieldVal,
+            { backgroundLoadingInProgress = it },
+        ) {
             it.entries.forEach { (branch, data) ->
                 if (data != null) lastTasks[branch] = data
             }
@@ -351,32 +362,50 @@ fun WallboardApp() {
                         },
                     )
 
-                    Button(
-                        onClick = ::triggerReload,
-                        enabled = state != AppState.LOADING,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = MaterialTheme.colors.secondary,
-                            contentColor = MaterialTheme.colors.onSecondary
-                        ),
+                    Row(modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(start = 5.dp, end = 5.dp, top = 5.dp)
+                        .fillMaxWidth()
+                        .clickable(enabled = state != AppState.LOADING) { triggerReload() }
+                        .background(color = if (state != AppState.LOADING) MaterialTheme.colors.secondary else Color.LightGray),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Outlined.Refresh, "Refresh")
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
+                            contentDescription = "Refresh",
+                            tint = MaterialTheme.colors.onSecondary
+                        )
                     }
 
-                    Button(
-                        onClick = ::authenticate,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = MaterialTheme.colors.secondary,
-                            contentColor = MaterialTheme.colors.onSecondary
-                        ),
+                    Row(modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(start = 5.dp, end = 5.dp, top = 5.dp)
+                        .fillMaxWidth()
+                        .clickable { authenticate() }
+                        .background(color = MaterialTheme.colors.secondary),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Text("Authenticate")
+                        Text(
+                            "Authenticate",
+                            color = MaterialTheme.colors.onSecondary,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                        )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = autoRefresh, enabled = lastTasks.isNotEmpty(), onCheckedChange = { changeAutoReloadSetting() })
-                        ClickableText(AnnotatedString("Auto-refresh"), onClick = { changeAutoReloadSetting() })
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(start = 5.dp, end = 5.dp, top = 5.dp)
+                            .clickable { changeAutoReloadSetting() }
+                            .fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = autoRefresh,
+                            enabled = lastTasks.isNotEmpty(),
+                            onCheckedChange = { changeAutoReloadSetting() },
+                        )
+                        Text("Auto-refresh")
                     }
                 }
 
@@ -419,7 +448,8 @@ fun WallboardApp() {
                                         amountSucceeded,
                                         amountFailed,
                                         totalAmount,
-                                        selectedTasks.first.buildCreatedTimestamp
+                                        selectedTasks.first.buildCreatedTimestamp,
+                                        backgroundLoadingInProgress,
                                     )
 
                                     Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
