@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.Checkbox
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -18,12 +20,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.toMutableStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.Histogram
@@ -33,8 +39,8 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
@@ -63,6 +69,7 @@ private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.co
 private val configStrings = configFile.readText().split(";")
 private val initialBranches = configStrings.elementAtOrNull(0)?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
 private val initialRepo = configStrings.elementAtOrNull(1) ?: ""
+private val autoRefreshEnabled = configStrings.elementAtOrNull(2)?.toBoolean() ?: true
 
 var cirrusData = CirrusData(API_CONF)
 
@@ -138,6 +145,10 @@ private enum class AppState {
     LOADING, ERROR, NONE, INIT
 }
 
+private fun writeConfig(branches: List<String>, repoTextFieldVal: String, isAutoRefreshEnabled: Boolean) {
+    configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal;$isAutoRefreshEnabled")
+}
+
 private fun reload(
     currentState: AppState,
     repoTextFieldVal: String,
@@ -148,6 +159,7 @@ private fun reload(
     setRepoTextFieldVal: (String) -> Unit,
     setLastTasks: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit,
     setSelectedTab: (String) -> Unit,
+    saveConfig: () -> Unit,
 ) {
     if (currentState != AppState.LOADING) {
         if (repoTextFieldVal.isBlank()) {
@@ -162,7 +174,7 @@ private fun reload(
 
         setState(AppState.LOADING)
 
-        configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal")
+        saveConfig()
 
         GlobalScope.launch {
             runCatching {
@@ -198,13 +210,43 @@ private fun reload(
     }
 }
 
+fun launchBackgroundRefreshPoll(
+    runId: Long,
+    getCurrentRunId: () -> Long,
+    branch: String,
+    repoTextFieldVal: String,
+    setResult: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit
+) = GlobalScope.launch {
+    val trimmedRepo = repoTextFieldVal.trim()
+    val repoId = if (trimmedRepo.toLongOrNull() != null) {
+        trimmedRepo
+    } else {
+        return@launch
+    }
+
+    println("Background refresh [$runId]: Starting for branch '$branch'...")
+
+    while (getCurrentRunId() <= runId) {
+        processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 15)).also {
+            if (getCurrentRunId() == runId) {
+                println("Background refresh [$runId]: got new data for ${it.keys}")
+                setResult(it)
+            }
+        }
+        delay(10_000)
+    }
+
+    println("Background refresh [$runId]: cancelled [${getCurrentRunId()}].")
+}
+
+
 @Composable
 @Preview
 fun WallboardApp() {
     var state by remember { mutableStateOf(AppState.INIT) }
     var error by remember { mutableStateOf("Unknown") }
     //var lastTasks by remember { mutableStateOf(emptyMap<String, SortedTasks?>()) }
-    var lastTasks by remember { mutableStateOf(emptyMap<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>()) }
+    var lastTasks by remember { mutableStateOf(mutableStateMapOf<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>()) }
     var dataByBranch = lastTasks.mapNotNull { (branch, tasks) ->
         if (tasks == null) null
         else branch to processData(tasks)
@@ -215,6 +257,13 @@ fun WallboardApp() {
     var repoTextFieldVal by remember { mutableStateOf(initialRepo) }
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
+    var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
+    var backgroundRefreshCounter by remember { mutableStateOf(0L) }
+    var lastSelectedTab: String? by remember { mutableStateOf(null) }
+
+    fun saveConfig() {
+        writeConfig(branches, repoTextFieldVal, autoRefresh)
+    }
 
     fun triggerReload() = reload(
         state,
@@ -224,8 +273,9 @@ fun WallboardApp() {
         { state = it },
         { error = it },
         { repoTextFieldVal = it },
-        { lastTasks = it },
-        { selectedTab = it }
+        { lastTasks = SnapshotStateMap<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>().apply { putAll(it) } },
+        { selectedTab = it },
+        { saveConfig() },
     )
 
     fun authenticate() {
@@ -233,6 +283,32 @@ fun WallboardApp() {
             GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
             triggerReload()
         }
+    }
+
+    fun startBackgroundRefreshPoll() {
+        val branch = selectedTab ?: return
+        launchBackgroundRefreshPoll(backgroundRefreshCounter, { backgroundRefreshCounter }, branch, repoTextFieldVal) {
+            it.entries.forEach { (branch, data) ->
+                if (data != null) lastTasks[branch] = data
+            }
+        }
+    }
+
+    fun changeAutoReloadSetting() {
+        autoRefresh = !autoRefresh
+        backgroundRefreshCounter++
+        if (autoRefresh) {
+            startBackgroundRefreshPoll()
+        }
+        saveConfig()
+    }
+
+    if (selectedTab != null && lastSelectedTab != selectedTab) {
+        if (autoRefresh) {
+            backgroundRefreshCounter++
+            startBackgroundRefreshPoll()
+        }
+        lastSelectedTab = selectedTab
     }
 
     MaterialTheme {
@@ -296,6 +372,11 @@ fun WallboardApp() {
                         ),
                     ) {
                         Text("Authenticate")
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = autoRefresh, enabled = lastTasks.isNotEmpty(), onCheckedChange = { changeAutoReloadSetting() })
+                        ClickableText(AnnotatedString("Auto-refresh"), onClick = { changeAutoReloadSetting() })
                     }
                 }
 
