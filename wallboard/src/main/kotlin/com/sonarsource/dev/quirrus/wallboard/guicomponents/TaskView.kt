@@ -8,13 +8,10 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +31,7 @@ import org.sonarsource.dev.quirrus.BuildNode
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
 
 
 private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefault())
@@ -51,7 +48,7 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                     task.latestRerun.name
                 }
         }.partition { (status, _) ->
-            status.status == StatusCategory.SUCCESS
+            status.status == StatusCategory.COMPLETED
         }.let { (first, second) ->
             first.sortedByDescending { it.first } to second.sortedByDescending { it.first }
         }

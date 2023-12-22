@@ -72,7 +72,7 @@ fun Histogram(
 
             val filteredTaskHistoryWithBuildNode = taskHistoryWithBuildNode.map { (buildNode, categorizedTasks) ->
                 buildNode to categorizedTasks.filter { (status, _) ->
-                    status.new || status.status != StatusCategory.SUCCESS
+                    status.new || status.status != StatusCategory.COMPLETED
                 }
             }
 
@@ -84,7 +84,7 @@ fun Histogram(
 
             val maxNotFailed = filteredTaskHistoryWithBuildNode.maxOf { (buildNode, tasks) ->
                 tasks.filter { (status, _) ->
-                    !status.status.isFailingState() && !(status.status == StatusCategory.SUCCESS && !status.new)
+                    !status.status.isFailingState() && !(status.status == StatusCategory.COMPLETED && !status.new)
                 }.values.sumOf { it.size }
             }
 
@@ -128,7 +128,7 @@ fun Histogram(
                     status.status.isFailingState()
                 }.let { (failed, other) ->
                     failed.sortedBy { (status, _) -> status } to
-                            other.sortedBy { (status, _) -> status }
+                        other.sortedBy { (status, _) -> status }
                 }.let { (failed, other) ->
                     val left = maxX - ((barWidth + (2 * barPadding)) * (i + 1)) + barPadding
                     failed.fold(zeroYOffset) { yOffset, (status, count) ->

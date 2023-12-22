@@ -3,22 +3,16 @@ package com.sonarsource.dev.quirrus.wallboard
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Checkbox
 import androidx.compose.material.Icon
-import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
@@ -34,7 +28,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.Histogram
@@ -52,6 +46,7 @@ import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.nio.file.Path
+import java.util.Locale
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createFile
 import kotlin.io.path.exists
@@ -330,9 +325,33 @@ fun WallboardApp() {
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Column(modifier = Modifier.weight(0.1f)) {
+                    Column(modifier = Modifier.background(Color.LightGray).fillMaxWidth().padding(top = 5.dp, bottom = 5.dp)) {
+                        Text(
+                            TASK_STATUS_LEGEND,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(bottom = 4.dp),
+                            color = MaterialTheme.colors.onBackground
+                        )
+                        StatusCategory.values().forEach { status ->
+                            Text(
+                                status.name.lowercase()
+                                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                                    .replace("_", " "),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .padding(top = 1.dp)
+                                    .align(Alignment.CenterHorizontally),
+                                color = status.color,
+                            )
+                        }
+                    }
+
                     TextField(
                         value = repoTextFieldVal,
                         label = { Label(CIRRUS_REPO_TEXT_FIELD_LABEL) },
+                        modifier = Modifier.padding(top = 5.dp),
                         onValueChange = { newValue ->
                             repoTextFieldVal = newValue
                         }
@@ -434,7 +453,7 @@ fun WallboardApp() {
                                         it.value.size
                                     }.sum()
                                     val amountSucceeded = selectedTasks.second.filter {
-                                        it.key.status == StatusCategory.SUCCESS
+                                        it.key.status == StatusCategory.COMPLETED
                                     }.map {
                                         it.value.size
                                     }.sum()
@@ -477,7 +496,7 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
     var maxOther = 0
 
     val filteredHistory = history.filterIndexed { i, (_, tasks) ->
-        i == 0 || tasks.values.any { StatusCategory.ofCirrusTask(it.latestRerun) != StatusCategory.UNDECIDED }
+        i == 0 || tasks.values.any { StatusCategory.ofCirrusTask(it.latestRerun) != StatusCategory.STALE }
     }
 
     return filteredHistory.mapIndexed { i, (build, taskMap) ->
@@ -509,19 +528,15 @@ private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>
 data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Status> {
     companion object {
         private fun StatusCategory.toInt() = when (this) {
-            StatusCategory.SUCCESS -> 2
-            StatusCategory.UNDECIDED -> 4
-            StatusCategory.FAIL_SOFT -> 6
-            StatusCategory.FAIL_HARD -> 8
+            StatusCategory.IN_PROGRESS -> 0
+            StatusCategory.COMPLETED -> 2
+            StatusCategory.STALE -> 4
+            StatusCategory.FAIL_OTHER -> 6
+            StatusCategory.FAIL_ANALYZE -> 8
         }
     }
 
-    val color: Color = when (status) {
-        StatusCategory.FAIL_HARD -> Color.Red
-        StatusCategory.FAIL_SOFT -> Color.Yellow
-        StatusCategory.SUCCESS -> Color.Green
-        StatusCategory.UNDECIDED -> Color.Gray
-    }.let {
+    val color: Color = status.color.let {
         if (!new) {
             it.copy(alpha = 0.4f)
         } else it
@@ -531,24 +546,28 @@ data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Sta
     override fun compareTo(other: Status) = toInt() - other.toInt()
 }
 
-enum class StatusCategory {
-    SUCCESS, FAIL_HARD, FAIL_SOFT, UNDECIDED;
+enum class StatusCategory(val color: Color) {
+    IN_PROGRESS(Color.Gray),
+    COMPLETED(Color.Green),
+    FAIL_ANALYZE(Color.Red),
+    FAIL_OTHER(Color.Yellow),
+    STALE(Color.DarkGray);
 
     companion object {
         fun ofCirrusTask(task: Task) = when (task.status) {
-            "COMPLETED" -> SUCCESS
+            "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING" -> IN_PROGRESS
+            "COMPLETED" -> COMPLETED
             "ABORTED", "FAILED" -> {
                 if (task.firstFailedCommand?.name?.contains("analyze") == true) {
-                    FAIL_HARD
+                    FAIL_ANALYZE
                 } else {
-                    FAIL_SOFT
+                    FAIL_OTHER
                 }
             }
-
-            "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING", "SKIPPED", "PAUSED" -> UNDECIDED
+            "SKIPPED", "PAUSED" -> STALE
             else -> throw Exception("Unknown task status ${task.status}")
         }
     }
 
-    fun isFailingState() = this == FAIL_HARD || this == FAIL_SOFT
+    fun isFailingState() = this == FAIL_ANALYZE || this == FAIL_OTHER
 }
