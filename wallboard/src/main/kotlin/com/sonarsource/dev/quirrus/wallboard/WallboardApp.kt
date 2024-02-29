@@ -532,7 +532,8 @@ data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Sta
             StatusCategory.COMPLETED -> 2
             StatusCategory.STALE -> 4
             StatusCategory.FAIL_OTHER -> 6
-            StatusCategory.FAIL_ANALYZE -> 8
+            StatusCategory.FAIL_SNAPSHOT -> 8
+            StatusCategory.FAIL_ANALYZE -> 10
         }
     }
 
@@ -550,6 +551,7 @@ enum class StatusCategory(val color: Color) {
     IN_PROGRESS(Color.Gray),
     COMPLETED(Color.Green),
     FAIL_ANALYZE(Color.Red),
+    FAIL_SNAPSHOT(Color.Blue),
     FAIL_OTHER(Color.Yellow),
     STALE(Color.DarkGray);
 
@@ -560,6 +562,8 @@ enum class StatusCategory(val color: Color) {
             "ABORTED", "FAILED" -> {
                 if (task.firstFailedCommand?.name?.contains("analyze") == true) {
                     FAIL_ANALYZE
+                } else if (task.firstFailedCommand?.name?.contains("snapshot") == true) {
+                    FAIL_SNAPSHOT
                 } else {
                     FAIL_OTHER
                 }
@@ -569,5 +573,5 @@ enum class StatusCategory(val color: Color) {
         }
     }
 
-    fun isFailingState() = this == FAIL_ANALYZE || this == FAIL_OTHER
+    fun isFailingState() = this in listOf(FAIL_ANALYZE, FAIL_OTHER, FAIL_SNAPSHOT)
 }
