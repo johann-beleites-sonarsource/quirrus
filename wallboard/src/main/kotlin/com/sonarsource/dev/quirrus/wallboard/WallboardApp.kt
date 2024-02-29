@@ -551,7 +551,7 @@ enum class StatusCategory(val color: Color) {
     IN_PROGRESS(Color.Gray),
     COMPLETED(Color.Green),
     FAIL_ANALYZE(Color.Red),
-    FAIL_SNAPSHOT(Color.Blue),
+    FAIL_SNAPSHOT(Color(0, 220, 240)),
     FAIL_OTHER(Color.Yellow),
     STALE(Color.DarkGray);
 
