@@ -38,12 +38,14 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.Common
+import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.nio.file.Path
 import java.util.Locale
@@ -239,6 +241,59 @@ fun launchBackgroundRefreshPoll(
 }
 
 
+data class TaskDiffData(val diffsByRule: Map<String, Int>, val newCount: Int?, val absentCount: Int?)
+
+private val logDownloader = LogDownloader(API_CONF)
+private val ruleRegex = """:(?<ruleKey>S[0-9]{3,4})[":\s]+(?<number>[0-9]+)""".toRegex()
+private val taskDiffGeneralInfoRegex = """NEW: (?<newCount>[0-9]+),.+ABSENT: (?<absentCount>[0-9]+)""".toRegex()
+private fun updateRulesWithDiff(
+    taskList: List<Task>,
+    addTaskDiff: (String, TaskDiffData?) -> Unit,
+    removeTaskDiff: (String) -> Unit,
+) {
+    for (task in taskList) {
+        addTaskDiff(task.id, null)
+        GlobalScope.async {
+            val job = launch {
+                logDownloader.downloadLogsForTasks(listOf(task), "snapshot_generation.log").firstOrNull()?.let { (_, log) ->
+                    val rules = ruleRegex.findAll(log).mapNotNull {
+                        val key = it.groups["ruleKey"]?.value ?: return@mapNotNull null
+                        val number = it.groups["number"]?.value?.toIntOrNull() ?: return@mapNotNull null
+                        key to number
+                    }.toMap()
+
+                    val (newCount, absentCount) = taskDiffGeneralInfoRegex.find(log)?.let {
+                        it.groups["newCount"]?.value?.toIntOrNull() to it.groups["absentCount"]?.value?.toIntOrNull()
+                    } ?: null to null
+
+                    addTaskDiff(task.id, TaskDiffData(rules, newCount, absentCount))
+                }
+            }
+            delay(30_000)
+            if (!job.isCompleted) {
+                job.cancel()
+                removeTaskDiff(task.id)
+            }
+        }
+    }
+}
+
+private fun extractTasksThatRequireLazyLoadingOfDiffRules(
+    dataByBranch: Map<String, List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>>,
+    tasksWithDiffs: Map<String, *>,
+): List<Task> =
+    dataByBranch.flatMap { (_, tasks) ->
+        tasks.flatMap { (_, taskMap) ->
+            taskMap.filterKeys {
+                it.status == StatusCategory.DIFF_SNAPSHOT
+            }.flatMap {
+                it.value.flatMap { it.taskReruns }
+            }.filter { task ->
+                !tasksWithDiffs.containsKey(task.id) && task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }
+            }
+        }
+    }
+
 @Composable
 @Preview
 fun WallboardApp() {
@@ -260,6 +315,11 @@ fun WallboardApp() {
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
     var lastSelectedTab: String? by remember { mutableStateOf(null) }
     var backgroundLoadingInProgress by remember { mutableStateOf(false) }
+    val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
+
+    updateRulesWithDiff(
+        extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs), tasksWithDiffs::put, tasksWithDiffs::remove
+    )
 
     fun saveConfig() {
         writeConfig(branches, repoTextFieldVal, autoRefresh)
@@ -478,7 +538,7 @@ fun WallboardApp() {
                                     }
 
                                     Row(modifier = Modifier.weight(0.6f)) {
-                                        TaskList(selectedTasks, taskListScrollState)
+                                        TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
                                     }
                                 }
                             }

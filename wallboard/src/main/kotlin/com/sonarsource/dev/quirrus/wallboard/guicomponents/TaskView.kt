@@ -22,11 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.Status
 import com.sonarsource.dev.quirrus.wallboard.StatusCategory
+import com.sonarsource.dev.quirrus.wallboard.TaskDiffData
 import org.sonarsource.dev.quirrus.BuildNode
 import java.awt.Desktop
 import java.net.URI
@@ -38,7 +41,11 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, verticalScrollState: ScrollState) {
+fun TaskList(
+    buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>,
+    verticalScrollState: ScrollState,
+    tasksWithDiffs: Map<String, TaskDiffData?>
+) {
     val (_, tasks) = buildNodeTasks
 
     val (completed, failed) = tasks.entries
@@ -141,7 +148,31 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                                         .padding(top = 1.dp, bottom = 2.dp)
                                 ) {
                                     ClickableText(
-                                        AnnotatedString("download diff_report.zip"),
+                                        AnnotatedString.Builder().apply {
+                                            append("download diff_report.zip: ")
+                                            tasksWithDiffs[task.id]?.let { diffData ->
+                                                append("[")
+
+                                                withStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontStyle = FontStyle.Italic)) {
+                                                    append("+${diffData.newCount}, -${diffData.absentCount}")
+                                                }
+
+                                                append(" | ")
+
+                                                diffData.diffsByRule.entries.forEachIndexed { i, (rule, diff) ->
+                                                    withStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Bold)) {
+                                                        this@apply.append(rule)
+                                                    }
+                                                    append(" ($diff)")
+
+                                                    if (i < diffData.diffsByRule.size - 1) {
+                                                        append(", ")
+                                                    }
+                                                }
+
+                                                append("]")
+                                            } ?: append("...")
+                                        }.toAnnotatedString(),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(start = 20.dp)
