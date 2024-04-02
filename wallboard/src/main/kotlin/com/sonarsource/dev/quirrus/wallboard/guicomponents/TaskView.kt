@@ -97,7 +97,7 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                                     if (task.firstFailedCommand != null) {
                                         append(task.firstFailedCommand?.name ?: "")
                                     } else if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
-                                        append("download diff_report.zip")
+                                        append("snapshot_generation")
                                     } else {
                                         append("")
                                     }
@@ -123,10 +123,31 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                                         .padding(start = 20.dp)
                                         .pointerHoverIcon(PointerIconDefaults.Hand),
                                 ) {
-                                    if (task.firstFailedCommand == null && task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
+                                    val logsArg = (task.firstFailedCommand?.name
+                                        ?: if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
+                                            "snapshot_generation"
+                                        } else {
+                                            null
+                                        })?.let { "?logs=$it#1" } ?: ""
+
+                                    openWebpage(URI("https://cirrus-ci.com/task/${task.id}$logsArg"))
+                                }
+                            }
+                            if (task.firstFailedCommand == null && task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(color = backgroundColor.copy(alpha = 0.2f))
+                                        .padding(top = 1.dp, bottom = 2.dp)
+                                ) {
+                                    ClickableText(
+                                        AnnotatedString("download diff_report.zip"),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 20.dp)
+                                            .pointerHoverIcon(PointerIconDefaults.Hand),
+                                    ) {
                                         openWebpage(URI("https://api.cirrus-ci.com/v1/artifact/task/${task.id}/diff_report.zip"))
-                                    } else {
-                                        openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
                                     }
                                 }
                             }
