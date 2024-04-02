@@ -94,8 +94,13 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                                         MaterialTheme.typography.body2.toSpanStyle()
                                             .copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colors.onBackground)
                                     )
-                                    append(task.firstFailedCommand?.name ?: "")
-
+                                    if (task.firstFailedCommand != null) {
+                                        append(task.firstFailedCommand?.name ?: "")
+                                    } else if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
+                                        append("download diff_report.zip")
+                                    } else {
+                                        append("")
+                                    }
                                     pushStyle(
                                         MaterialTheme.typography.body2.toSpanStyle()
                                             .copy(fontWeight = FontWeight.Light, color = MaterialTheme.colors.onBackground)
@@ -118,7 +123,11 @@ fun TaskList(buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>, v
                                         .padding(start = 20.dp)
                                         .pointerHoverIcon(PointerIconDefaults.Hand),
                                 ) {
-                                    openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
+                                    if (task.firstFailedCommand == null && task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
+                                        openWebpage(URI("https://api.cirrus-ci.com/v1/artifact/task/${task.id}/diff_report.zip"))
+                                    } else {
+                                        openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
+                                    }
                                 }
                             }
                         }

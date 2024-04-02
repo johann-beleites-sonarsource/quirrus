@@ -187,7 +187,7 @@ private fun reload(
                     }
                 }
 
-                processData(cirrusData.getLastPeachBuilds(repoId, branches, 15)).also {
+                processData(cirrusData.getLastPeachBuilds(repoId, branches, 8)).also {
                     setLastTasks(it)
                 }
             }.onFailure { e ->
@@ -228,7 +228,7 @@ fun launchBackgroundRefreshPoll(
 
     while (getCurrentRunId() <= runId) {
         setBackgroundLoadingInProgress(true)
-        processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 15)).also {
+        processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 8)).also {
             if (getCurrentRunId() == runId) {
                 setResult(it)
                 setBackgroundLoadingInProgress(false)
@@ -532,7 +532,7 @@ data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Sta
             StatusCategory.COMPLETED -> 2
             StatusCategory.STALE -> 4
             StatusCategory.FAIL_OTHER -> 6
-            StatusCategory.FAIL_SNAPSHOT -> 8
+            StatusCategory.DIFF_SNAPSHOT -> 8
             StatusCategory.FAIL_ANALYZE -> 10
         }
     }
@@ -551,27 +551,19 @@ enum class StatusCategory(val color: Color) {
     IN_PROGRESS(Color.Gray),
     COMPLETED(Color.Green),
     FAIL_ANALYZE(Color.Red),
-    FAIL_SNAPSHOT(Color(0, 220, 240)),
+    DIFF_SNAPSHOT(Color(0, 220, 240)),
     FAIL_OTHER(Color.Yellow),
     STALE(Color.DarkGray);
 
     companion object {
         fun ofCirrusTask(task: Task) = when (task.status) {
             "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING" -> IN_PROGRESS
-            "COMPLETED" -> COMPLETED
-            "ABORTED", "FAILED" -> {
-                if (task.firstFailedCommand?.name?.contains("analyze") == true) {
-                    FAIL_ANALYZE
-                } else if (task.firstFailedCommand?.name?.contains("snapshot") == true) {
-                    FAIL_SNAPSHOT
-                } else {
-                    FAIL_OTHER
-                }
-            }
+            "COMPLETED" -> if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) DIFF_SNAPSHOT else COMPLETED
+            "ABORTED", "FAILED" -> if (task.firstFailedCommand?.name?.contains("analyze") == true) FAIL_ANALYZE else FAIL_OTHER
             "SKIPPED", "PAUSED" -> STALE
             else -> throw Exception("Unknown task status ${task.status}")
         }
     }
 
-    fun isFailingState() = this in listOf(FAIL_ANALYZE, FAIL_OTHER, FAIL_SNAPSHOT)
+    fun isFailingState() = this in listOf(FAIL_ANALYZE, FAIL_OTHER, DIFF_SNAPSHOT)
 }

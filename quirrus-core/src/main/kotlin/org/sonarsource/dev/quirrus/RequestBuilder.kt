@@ -30,6 +30,13 @@ object RequestBuilder {
                                         field("durationInSeconds")
                                         //field("logsTail")
                                     }
+                                    fieldObject("artifacts") {
+                                        field("name")
+                                        fieldObject("files") {
+                                            field("path")
+                                            field("size")
+                                        }
+                                    }
                                 }
                             }
                         }

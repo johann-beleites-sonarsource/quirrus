@@ -31,7 +31,7 @@ val json = Json {
 class ApiConfiguration(
     val authenticator: ((HttpRequestBuilder) -> Unit)? = null,
     val apiUrl: String = "https://api.cirrus-ci.com/graphql",
-    val requestTimeoutOverride: Long? = null,
+    val requestTimeoutOverride: Long? = 60_000,
     val connectionRetries: Int = 5,
     val logger: Logger? = null
 ) {
@@ -56,6 +56,7 @@ class ApiConfiguration(
         requestTimeoutOverride?.let { timeoutOverride ->
             install(HttpTimeout) {
                 requestTimeoutMillis = timeoutOverride
+                socketTimeoutMillis = timeoutOverride
             }
         }
     }
