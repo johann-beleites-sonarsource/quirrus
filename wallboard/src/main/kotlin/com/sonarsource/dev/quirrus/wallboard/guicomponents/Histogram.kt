@@ -35,7 +35,7 @@ import java.util.Date
 
 val barPadding = 5f
 
-val dateOnly = SimpleDateFormat("yy-MM-dd")
+val dateOnly = SimpleDateFormat("dd.MM.yyyy")
 val timeOnly = SimpleDateFormat("HH:mm")
 
 @OptIn(ExperimentalComposeUiApi::class)
