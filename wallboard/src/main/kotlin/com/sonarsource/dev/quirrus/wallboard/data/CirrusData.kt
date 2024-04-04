@@ -1,4 +1,4 @@
-package com.sonarsource.dev.quirrus.wallboard
+package com.sonarsource.dev.quirrus.wallboard.data
 
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.async
@@ -8,7 +8,7 @@ import org.sonarsource.dev.quirrus.api.ApiException
 import org.sonarsource.dev.quirrus.api.LogDownloader
 
 class CirrusData(val apiConfig: ApiConfiguration) {
-    suspend fun getLastPeachBuilds(repo: String, branch: String, numberOfBuilds: Int = 1) =
+    private suspend fun getLastPeachBuilds(repo: String, branch: String, numberOfBuilds: Int = 1) =
         LogDownloader(apiConfig).getLastNBuilds(repo, branch, numberOfBuilds).let { (response, repositoryApiResponse) ->
             if (response.status == HttpStatusCode.OK) {
                 repositoryApiResponse.data?.repository?.builds.let {

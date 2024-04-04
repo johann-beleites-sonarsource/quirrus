@@ -30,6 +30,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.autoRefreshEnabled
+import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.branches
+import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.repo
+import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
+import com.sonarsource.dev.quirrus.wallboard.data.CirrusData
+import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
+import com.sonarsource.dev.quirrus.wallboard.data.Status
+import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.Histogram
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.Label
@@ -47,32 +55,8 @@ import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
-import java.nio.file.Path
 import java.util.Locale
 import javax.net.ssl.SSLHandshakeException
-import kotlin.io.path.createDirectories
-import kotlin.io.path.createFile
-import kotlin.io.path.exists
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.readText
-import kotlin.io.path.writeText
-
-private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.conf").also { file ->
-    if (!file.parent.exists()) {
-        file.parent.createDirectories()
-    }
-
-    if (!file.exists()) {
-        file.createFile()
-    } else if (!file.isRegularFile()) {
-        throw IllegalStateException("config file '$file' exists but is not a regular file")
-    }
-}
-
-private val configStrings = configFile.readText().split(";")
-private val initialBranches = configStrings.elementAtOrNull(0)?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
-private val initialRepo = configStrings.elementAtOrNull(1) ?: ""
-private val autoRefreshEnabled = configStrings.elementAtOrNull(2)?.toBoolean() ?: true
 
 var cirrusData = CirrusData(API_CONF)
 
@@ -93,16 +77,17 @@ private fun processData(builds: Map<String, Builds?>) =
         }.sortedByDescending {
             it.buildCreatedTimestamp
         }.mapIndexed { buildIndex, buildNode ->
-            buildNode to buildNode.tasks.groupBy { task ->
+            val tasks = buildNode.tasks.groupBy { task ->
                 task.name
             }.map { (name, reruns) ->
                 // We set the last build with different status later.
                 name to EnrichedTask(reruns.sortedByDescending { it.creationTimestamp }, buildNode, null)
             }.toMap()
+            BuildWithTasks(buildNode, tasks)
         }
 
-        enrichedBuilds.mapIndexed { i, tasks ->
-            tasks.first to tasks.second.forEach { (taskName, task) ->
+        enrichedBuilds.mapIndexed { i, build ->
+            build.node to build.tasks.forEach { (taskName, task) ->
                 val currentStatus = task.latestRerun.status
                 task.lastBuildWithDifferentStatus = enrichedBuilds.drop(i + 1).firstOrNull { (_, previousTasks) ->
                     (previousTasks[taskName]?.latestRerun?.status ?: currentStatus) != currentStatus
@@ -148,10 +133,6 @@ private enum class AppState {
     LOADING, ERROR, NONE, INIT
 }
 
-private fun writeConfig(branches: List<String>, repoTextFieldVal: String, isAutoRefreshEnabled: Boolean) {
-    configFile.writeText("${branches.joinToString(",")};$repoTextFieldVal;$isAutoRefreshEnabled")
-}
-
 private fun reload(
     currentState: AppState,
     repoTextFieldVal: String,
@@ -160,7 +141,7 @@ private fun reload(
     setState: (AppState) -> Unit,
     setError: (String) -> Unit,
     setRepoTextFieldVal: (String) -> Unit,
-    setLastTasks: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit,
+    setLastTasks: (Map<String, List<BuildWithTasks>?>) -> Unit,
     setSelectedTab: (String) -> Unit,
     saveConfig: () -> Unit,
 ) {
@@ -218,7 +199,7 @@ fun launchBackgroundRefreshPoll(
     branch: String,
     repoTextFieldVal: String,
     setBackgroundLoadingInProgress: (Boolean) -> Unit,
-    setResult: (Map<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>) -> Unit,
+    setResult: (Map<String, List<BuildWithTasks>?>) -> Unit,
 ) = GlobalScope.launch {
     val trimmedRepo = repoTextFieldVal.trim()
     val repoId = if (trimmedRepo.toLongOrNull() != null) {
@@ -299,16 +280,15 @@ private fun extractTasksThatRequireLazyLoadingOfDiffRules(
 fun WallboardApp() {
     var state by remember { mutableStateOf(AppState.INIT) }
     var error by remember { mutableStateOf("Unknown") }
-    //var lastTasks by remember { mutableStateOf(emptyMap<String, SortedTasks?>()) }
-    var lastTasks by remember { mutableStateOf(mutableStateMapOf<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>()) }
+    var lastTasks by remember { mutableStateOf(mutableStateMapOf<String, List<BuildWithTasks>?>()) }
     var dataByBranch = lastTasks.mapNotNull { (branch, tasks) ->
         if (tasks == null) null
-        else branch to processData(tasks)
+        else branch to DataProcessing.processData(tasks)
     }.toMap()
     var selectedTab: String? by remember { mutableStateOf(null) }
-    var branches by remember { mutableStateOf(initialBranches) }
-    var branchesTextFieldVal by remember { mutableStateOf(initialBranches.joinToString(",")) }
-    var repoTextFieldVal by remember { mutableStateOf(initialRepo) }
+    var branches by remember { mutableStateOf(branches) }
+    var branchesTextFieldVal by remember { mutableStateOf(WallboardConfig.branches.joinToString(",")) }
+    var repoTextFieldVal by remember { mutableStateOf(repo) }
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
     var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
@@ -322,7 +302,12 @@ fun WallboardApp() {
     )
 
     fun saveConfig() {
-        writeConfig(branches, repoTextFieldVal, autoRefresh)
+        with(WallboardConfig) {
+            WallboardConfig.branches = branches
+            repo = repoTextFieldVal
+            autoRefreshEnabled = autoRefresh
+            WallboardConfig.saveConfig()
+        }
     }
 
     fun triggerReload() = reload(
@@ -333,7 +318,7 @@ fun WallboardApp() {
         { state = it },
         { error = it },
         { repoTextFieldVal = it },
-        { lastTasks = SnapshotStateMap<String, List<Pair<BuildNode, Map<String, EnrichedTask>>>?>().apply { putAll(it) } },
+        { lastTasks = SnapshotStateMap<String, List<BuildWithTasks>?>().apply { putAll(it) } },
         { selectedTab = it },
         { saveConfig() },
     )
@@ -550,80 +535,6 @@ fun WallboardApp() {
     }
 }
 
-private fun processData(history: List<Pair<BuildNode, Map<String, EnrichedTask>>>): List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>> {
 
-    var maxFailed = 0
-    var maxOther = 0
 
-    val filteredHistory = history.filterIndexed { i, (_, tasks) ->
-        i == 0 || tasks.values.any { StatusCategory.ofCirrusTask(it.latestRerun) != StatusCategory.STALE }
-    }
 
-    return filteredHistory.mapIndexed { i, (build, taskMap) ->
-        var failed = 0
-        var other = 0
-
-        val grouped = taskMap.values.groupBy { task ->
-            val status = StatusCategory.ofCirrusTask(task.latestRerun)
-
-            when {
-                status.isFailingState() -> failed++
-                else -> other++
-            }
-
-            val isNewStatus = filteredHistory.getOrNull(i + 1)?.second?.get(task.latestRerun.name)?.latestRerun?.let { lastRun ->
-                lastRun.status != task.latestRerun.status || StatusCategory.ofCirrusTask(lastRun) != status
-            } ?: (i < filteredHistory.size - 1)
-
-            Status(status, isNewStatus)
-        }
-
-        if (failed > maxFailed) maxFailed = failed
-        if (other > maxOther) maxOther = other
-
-        build to grouped
-    }
-}
-
-data class Status(val status: StatusCategory, val new: Boolean) : Comparable<Status> {
-    companion object {
-        private fun StatusCategory.toInt() = when (this) {
-            StatusCategory.IN_PROGRESS -> 0
-            StatusCategory.COMPLETED -> 2
-            StatusCategory.STALE -> 4
-            StatusCategory.FAIL_OTHER -> 6
-            StatusCategory.DIFF_SNAPSHOT -> 8
-            StatusCategory.FAIL_ANALYZE -> 10
-        }
-    }
-
-    val color: Color = status.color.let {
-        if (!new) {
-            it.copy(alpha = 0.4f)
-        } else it
-    }
-
-    private fun toInt() = status.toInt().let { if (!new) it - 1 else it }
-    override fun compareTo(other: Status) = toInt() - other.toInt()
-}
-
-enum class StatusCategory(val color: Color) {
-    IN_PROGRESS(Color.Gray),
-    COMPLETED(Color.Green),
-    FAIL_ANALYZE(Color.Red),
-    DIFF_SNAPSHOT(Color(0, 220, 240)),
-    FAIL_OTHER(Color.Yellow),
-    STALE(Color.DarkGray);
-
-    companion object {
-        fun ofCirrusTask(task: Task) = when (task.status) {
-            "CREATED", "TRIGGERED", "SCHEDULED", "EXECUTING" -> IN_PROGRESS
-            "COMPLETED" -> if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) DIFF_SNAPSHOT else COMPLETED
-            "ABORTED", "FAILED" -> if (task.firstFailedCommand?.name?.contains("analyze") == true) FAIL_ANALYZE else FAIL_OTHER
-            "SKIPPED", "PAUSED" -> STALE
-            else -> throw Exception("Unknown task status ${task.status}")
-        }
-    }
-
-    fun isFailingState() = this in listOf(FAIL_ANALYZE, FAIL_OTHER, DIFF_SNAPSHOT)
-}
