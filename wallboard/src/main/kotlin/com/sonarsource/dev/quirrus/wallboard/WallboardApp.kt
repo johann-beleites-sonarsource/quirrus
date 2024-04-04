@@ -49,6 +49,7 @@ import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.nio.file.Path
 import java.util.Locale
+import javax.net.ssl.SSLHandshakeException
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createFile
 import kotlin.io.path.exists
@@ -193,13 +194,12 @@ private fun reload(
                     setLastTasks(it)
                 }
             }.onFailure { e ->
-                val error = e.stackTraceToString()
-                setError(error)
-
-                if (e is NoSuchFileException || e is java.nio.file.NoSuchFileException) {
-                    setError("Have you tried authenticating?\n\n$error")
+                val errorMsg = when (e) {
+                    is SSLHandshakeException -> "Could not verify TLS certificate!\n\n"
+                    is NoSuchFileException, is java.nio.file.NoSuchFileException -> "Have you tried authenticating?\n\n"
+                    else -> ""
                 }
-
+                setError(errorMsg + e.stackTraceToString())
                 setState(AppState.ERROR)
                 e.printStackTrace(System.err)
             }.onSuccess { lastTasks ->
