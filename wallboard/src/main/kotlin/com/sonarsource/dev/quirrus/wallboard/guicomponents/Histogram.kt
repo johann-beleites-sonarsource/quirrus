@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
-import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
+import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.jetbrains.skia.Font

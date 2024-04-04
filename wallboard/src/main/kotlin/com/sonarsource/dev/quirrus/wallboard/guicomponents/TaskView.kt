@@ -26,10 +26,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.sonarsource.dev.quirrus.wallboard.EnrichedTask
+import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
-import com.sonarsource.dev.quirrus.wallboard.TaskDiffData
+import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import org.sonarsource.dev.quirrus.BuildNode
 import java.awt.Desktop
 import java.net.URI
