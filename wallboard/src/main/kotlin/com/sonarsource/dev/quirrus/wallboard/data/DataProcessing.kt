@@ -1,6 +1,5 @@
 package com.sonarsource.dev.quirrus.wallboard.data
 
-import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import org.sonarsource.dev.quirrus.BuildNode
 import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
@@ -10,64 +9,38 @@ object DataProcessing {
     internal fun processData(buildsByBranch: Map<String, Builds?>) =
         buildsByBranch.map { (branch, builds) ->
             if (builds == null || builds.edges.isEmpty()) return@map branch to null
-
-            /*val (latestBuild, previousBuilds) = builds.edges.map {
-                it.node
-            }.sortedByDescending {
-                it.buildCreatedTimestamp
-            }.let {
-                it.first() to it.drop(1)
-            }*/
-
-            val enrichedBuilds = builds.edges.map {
-                it.node
-            }.sortedByDescending {
-                it.buildCreatedTimestamp
-            }.mapIndexed { buildIndex, buildNode ->
-                val tasks = buildNode.tasks.groupBy { task ->
-                    task.name
-                }.map { (name, reruns) ->
-                    // We set the last build with different status later.
-                    name to EnrichedTask(reruns.sortedByDescending { it.creationTimestamp }, buildNode, null)
-                }.toMap()
-                BuildWithTasks(buildNode, tasks)
-            }
-
-            enrichedBuilds.mapIndexed { i, build ->
-                build.node to build.tasks.forEach { (taskName, task) ->
-                    val currentStatus = task.latestRerun.status
-                    task.lastBuildWithDifferentStatus = enrichedBuilds.drop(i + 1).firstOrNull { (_, previousTasks) ->
-                        (previousTasks[taskName]?.latestRerun?.status ?: currentStatus) != currentStatus
-                    }?.let { (_, previousTasks) ->
-                        previousTasks[taskName]?.build
-                    }
-                }
-            }
-
-
-            branch to enrichedBuilds
-
-            // This could be more efficient e.g. by transforming the data into maps to lookup in instead
-
-            /*val (completed, failed) = sortedBuilds.tasks
-                .groupBy { it.name }
-                .map { (name, tasks) ->
-                    val tasksSorted = tasks.sortedBy { it.id }
-                    val currentTask = tasksSorted.last()
-
-                    val lastDifferingBuild = previousBuilds.firstOrNull { previousBuild ->
-                        previousBuild.tasks.firstOrNull { previousTask ->
-                            previousTask.name == currentTask.name
-                        }?.status !in listOf(currentTask.status, "SKIPPED", "ABORTED")
-                    }
-
-                    EnrichedTask(tasks, latestBuild, lastDifferingBuild)
-                }.partition {
-                    it.tasks.last().status == "COMPLETED"
-                }
-
-            branch to SortedTasks(completed, failed)*/
+            branch to processBuildData(builds)
         }.toMap()
+
+    internal fun processBuildData(builds: Builds): List<BuildWithTasks> {
+
+        val enrichedBuilds = builds.edges.map {
+            it.node
+        }.sortedByDescending {
+            it.buildCreatedTimestamp
+        }.mapIndexed { buildIndex, buildNode ->
+            val tasks = buildNode.tasks.groupBy { task ->
+                task.name
+            }.map { (name, reruns) ->
+                // We set the last build with different status later.
+                name to EnrichedTask(reruns.sortedByDescending { it.creationTimestamp }, buildNode, null)
+            }.toMap()
+            BuildWithTasks(buildNode, tasks)
+        }
+
+        enrichedBuilds.forEachIndexed { i, build ->
+            build.node to build.tasks.forEach { (taskName, task) ->
+                val currentStatus = task.latestRerun.status
+                task.lastBuildWithDifferentStatus = enrichedBuilds.drop(i + 1).firstOrNull { (_, previousTasks) ->
+                    (previousTasks[taskName]?.latestRerun?.status ?: currentStatus) != currentStatus
+                }?.let { (_, previousTasks) ->
+                    previousTasks[taskName]?.build
+                }
+            }
+        }
+
+        return enrichedBuilds
+    }
 
 
 

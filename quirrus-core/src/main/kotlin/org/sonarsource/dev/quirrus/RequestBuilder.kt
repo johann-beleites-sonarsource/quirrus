@@ -6,9 +6,10 @@ object RequestBuilder {
     fun logDownloadLink(taskId: String, logName: String) =
         "https://api.cirrus-ci.com/v1/task/$taskId/logs/$logName"
 
-    fun tasksQuery(repositoryId: String, branchName: String?, numberOfLatestBuilds: Int = 1): Kraph {
+    fun tasksQuery(repositoryId: String, branchName: String?, numberOfLatestBuilds: Int = 1, beforeTimestamp: Long? = null): Kraph {
         val buildsArgs: MutableMap<String, Any> = mutableMapOf("last" to numberOfLatestBuilds)
         branchName?.let { buildsArgs["branch"] = it }
+        beforeTimestamp?.let { buildsArgs["before"] = "$it" }
 
         return Kraph {
             query {
@@ -18,6 +19,7 @@ object RequestBuilder {
                             fieldObject("node") {
                                 field("id")
                                 field("buildCreatedTimestamp")
+                                field("changeTimestamp")
                                 field("branch")
                                 fieldObject("tasks") {
                                     field("name")

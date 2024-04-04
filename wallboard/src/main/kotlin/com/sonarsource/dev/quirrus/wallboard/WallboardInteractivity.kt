@@ -3,14 +3,21 @@ package com.sonarsource.dev.quirrus.wallboard
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.channels.produce
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.sonarsource.dev.quirrus.Builds
 import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
 
 internal fun reloadData(
@@ -18,12 +25,14 @@ internal fun reloadData(
     repoTextFieldVal: String,
     branches: List<String>,
     selectedTab: String?,
+    lastTasksAcc: MutableMap<String, List<BuildWithTasks>?>,
     setState: (AppState) -> Unit,
     setError: (String) -> Unit,
     setRepoTextFieldVal: (String) -> Unit,
-    setLastTasks: (Map<String, List<BuildWithTasks>?>) -> Unit,
     setSelectedTab: (String) -> Unit,
     saveConfig: () -> Unit,
+    setBranchState: (String, AppState) -> Unit,
+    setBranchError: (String, String) -> Unit,
 ) {
     if (currentState != AppState.LOADING) {
         if (repoTextFieldVal.isBlank()) {
@@ -51,9 +60,8 @@ internal fun reloadData(
                     }
                 }
 
-                DataProcessing.processData(cirrusData.getLastPeachBuilds(repoId, branches, 8)).also {
-                    setLastTasks(it)
-                }
+                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState)
+
             }.onFailure { e ->
                 val errorMsg = when (e) {
                     is SSLHandshakeException -> "Could not verify TLS certificate!\n\n"
@@ -63,14 +71,78 @@ internal fun reloadData(
                 setError(errorMsg + e.stackTraceToString())
                 setState(AppState.ERROR)
                 e.printStackTrace(System.err)
-            }.onSuccess { lastTasks ->
+            }.onSuccess {
                 if (selectedTab == null) {
-                    setSelectedTab(lastTasks.keys.minOf { it })
+                    setSelectedTab(branches.first())
                 }
                 setState(AppState.NONE)
             }
         }
     }
+}
+
+private suspend fun fetchDataIncrementallyByBranch(
+    repoId: String,
+    branches: List<String>,
+    lastTasks: MutableMap<String, List<BuildWithTasks>?>,
+    setBranchState: (String, AppState) -> Unit,
+) {
+    // First get only the last 2 builds for each branch
+    coroutineScope {
+        // TODO: error handling
+
+        val numberOfBuildsToFetch = 10
+        val fetchedBuildsPerBranch = branches.associateWith { AtomicInteger(0) }
+        val dataInputChannel = Channel<Pair<String, Builds?>>()
+        val nextRequestChannel = Channel<Pair<String, Long>>()
+
+        val updaterJob = launch {
+            dataInputChannel.consumeEach { (branch, builds) ->
+
+                if (builds != null) {
+                    DataProcessing.processBuildData(builds).also {
+                        lastTasks[branch] = (lastTasks[branch] ?: emptyList()) + it
+
+                        // TODO: introduce background loading state
+                        setBranchState(branch, AppState.NONE)
+                    }
+                }
+
+                if (fetchedBuildsPerBranch[branch]!!.addAndGet(builds?.edges?.size ?: 0) < numberOfBuildsToFetch) {
+                    builds?.edges?.minOf { it.node.changeTimestamp }?.let { timestamp ->
+                        nextRequestChannel.send(branch to timestamp)
+                    }
+                }
+
+
+            }
+        }
+
+        val fetcherJob = launch {
+            nextRequestChannel.consumeEach { (branch, oldestTimestamp) ->
+                async {
+                    dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 1, oldestTimestamp))
+                }
+            }
+        }
+
+        branches.map { branch ->
+            async {
+                dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 2))
+            }
+        }.forEach {
+            it.await()
+        }
+
+
+
+        while (fetchedBuildsPerBranch.values.any { it.get() < numberOfBuildsToFetch }) {
+            delay(500)
+        }
+        fetcherJob.cancel()
+        updaterJob.cancel()
+    }
+
 }
 
 internal fun launchBackgroundRefreshPoll(
