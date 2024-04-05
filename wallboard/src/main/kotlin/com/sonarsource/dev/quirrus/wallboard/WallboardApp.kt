@@ -70,7 +70,8 @@ fun WallboardApp() {
     var repoTextFieldVal by remember { mutableStateOf(repo) }
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
-    var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
+    //var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
+    var autoRefresh = false
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
     var lastSelectedTab: String? by remember { mutableStateOf(null) }
     var backgroundLoadingInProgress by remember { mutableStateOf(false) }
@@ -240,7 +241,7 @@ fun WallboardApp() {
                         )
                     }
 
-                    Row(
+                    /*Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, end = 5.dp, top = 5.dp)
@@ -253,7 +254,7 @@ fun WallboardApp() {
                             onCheckedChange = { changeAutoReloadSetting() },
                         )
                         Text("Auto-refresh")
-                    }
+                    }*/
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
