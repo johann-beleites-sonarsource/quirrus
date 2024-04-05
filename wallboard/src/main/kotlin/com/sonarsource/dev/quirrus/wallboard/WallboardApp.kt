@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,8 +35,6 @@ import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.repo
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.CirrusData
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
-import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
-import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
@@ -49,12 +46,7 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.sonarsource.dev.quirrus.BuildNode
-import org.sonarsource.dev.quirrus.Task
-import org.sonarsource.dev.quirrus.api.Common
-import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.Locale
-import javax.net.ssl.SSLHandshakeException
 
 var cirrusData = CirrusData(API_CONF)
 
@@ -78,11 +70,14 @@ fun WallboardApp() {
     var repoTextFieldVal by remember { mutableStateOf(repo) }
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
-    var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
+    //var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
+    var autoRefresh = false
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
     var lastSelectedTab: String? by remember { mutableStateOf(null) }
     var backgroundLoadingInProgress by remember { mutableStateOf(false) }
     val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
+    val branchState by remember { mutableStateOf(mutableStateMapOf<String, AppState>()) }
+    val errors by remember { mutableStateOf(mutableStateMapOf<String, String>()) }
 
     fun saveConfig() {
         with(WallboardConfig) {
@@ -94,17 +89,23 @@ fun WallboardApp() {
     }
 
     fun triggerReload() {
+        lastTasks.clear()
+        lastTasks.putAll(branches.map { it to null })
+        branchState.clear()
+        branchState.putAll(branches.map { it to AppState.LOADING })
         reloadData(
             state,
             repoTextFieldVal,
             branches,
             selectedTab,
+            lastTasks,
             { state = it },
             { error = it },
             { repoTextFieldVal = it },
-            { lastTasks = SnapshotStateMap<String, List<BuildWithTasks>?>().apply { putAll(it) } },
             { selectedTab = it },
             { saveConfig() },
+            { branch, state -> branchState[branch] = state },
+            { branch, error -> errors[branch] = error }
         )
         updateRulesWithDiff(
             DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs),
@@ -240,7 +241,7 @@ fun WallboardApp() {
                         )
                     }
 
-                    Row(
+                    /*Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, end = 5.dp, top = 5.dp)
@@ -253,15 +254,19 @@ fun WallboardApp() {
                             onCheckedChange = { changeAutoReloadSetting() },
                         )
                         Text("Auto-refresh")
-                    }
+                    }*/
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
                     Row {
-                        when (state) {
+                        if (state == AppState.INIT){
+                            triggerReload()
+                            return@Row
+                        }
+
+                        when (branchState[selectedTab]) {
                             AppState.LOADING -> LoadingScreen()
-                            AppState.ERROR -> ErrorScreen(error)
-                            AppState.INIT -> triggerReload()
+                            AppState.ERROR -> ErrorScreen(errors[selectedTab] ?: "NULL")
                             else -> dataByBranch[selectedTab]?.let { taskHistory ->
                                 Column(
                                     modifier = Modifier

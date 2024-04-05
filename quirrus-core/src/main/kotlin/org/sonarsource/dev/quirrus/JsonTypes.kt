@@ -18,7 +18,7 @@ data class Builds(val edges: List<Edge>)
 data class Edge(val node: BuildNode)
 
 @Serializable
-data class BuildNode(val id: String, val buildCreatedTimestamp: Long, val tasks: List<Task>, val branch: String)
+data class BuildNode(val id: String, val buildCreatedTimestamp: Long, val changeTimestamp: Long, val tasks: List<Task>, val branch: String)
 
 @Serializable
 data class Task(val id: String, val name: String, val creationTimestamp: Long, val status: String = "NONE", val firstFailedCommand: FirstFailedCommand? = null, val automaticReRun: Boolean = false, val artifacts: List<Artifacts> = emptyList())

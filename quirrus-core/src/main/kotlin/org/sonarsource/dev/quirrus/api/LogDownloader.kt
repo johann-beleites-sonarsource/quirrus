@@ -45,8 +45,8 @@ class LogDownloader(private val apiConfiguration: ApiConfiguration) {
         }.toList()
     }
 
-    suspend fun getLastNBuilds(repositoryId: String, branch: String?, numberOfBuilds: Int) =
-        apiConfiguration.post(RequestBuilder.tasksQuery(repositoryId, branch, numberOfBuilds)).let {
+    suspend fun getLastNBuilds(repositoryId: String, branch: String?, numberOfBuilds: Int, beforeTimestamp: Long? = null) =
+        apiConfiguration.post(RequestBuilder.tasksQuery(repositoryId, branch, numberOfBuilds, beforeTimestamp)).let {
             it to it.body<RepositoryApiResponse>()
         }
 

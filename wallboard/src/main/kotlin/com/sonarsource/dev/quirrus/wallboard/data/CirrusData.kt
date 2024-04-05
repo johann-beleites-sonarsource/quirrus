@@ -8,8 +8,8 @@ import org.sonarsource.dev.quirrus.api.ApiException
 import org.sonarsource.dev.quirrus.api.LogDownloader
 
 class CirrusData(val apiConfig: ApiConfiguration) {
-    private suspend fun getLastPeachBuilds(repo: String, branch: String, numberOfBuilds: Int = 1) =
-        LogDownloader(apiConfig).getLastNBuilds(repo, branch, numberOfBuilds).let { (response, repositoryApiResponse) ->
+    suspend fun getLastPeachBuilds(repo: String, branch: String, numberOfBuilds: Int = 1, beforeTimestamp: Long? = null) =
+        LogDownloader(apiConfig).getLastNBuilds(repo, branch, numberOfBuilds, beforeTimestamp).let { (response, repositoryApiResponse) ->
             if (response.status == HttpStatusCode.OK) {
                 repositoryApiResponse.data?.repository?.builds.let {
                     it ?: repositoryApiResponse.errors?.firstOrNull()?.let { e -> throw ApiException(response, e.message) }
