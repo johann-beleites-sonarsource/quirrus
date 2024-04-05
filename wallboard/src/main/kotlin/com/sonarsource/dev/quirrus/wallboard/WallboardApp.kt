@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.Checkbox
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -26,10 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.autoRefreshEnabled
 import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.branches
 import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.repo
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
@@ -93,6 +93,9 @@ fun WallboardApp() {
         lastTasks.putAll(branches.map { it to null })
         branchState.clear()
         branchState.putAll(branches.map { it to AppState.LOADING })
+        if (selectedTab !in branches) {
+            selectedTab = branches.firstOrNull()
+        }
         reloadData(
             state,
             repoTextFieldVal,
@@ -219,12 +222,19 @@ fun WallboardApp() {
                         .background(color = if (state != AppState.LOADING) MaterialTheme.colors.secondary else Color.LightGray),
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            Icons.Outlined.Refresh,
-                            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
-                            contentDescription = "Refresh",
-                            tint = MaterialTheme.colors.onSecondary
-                        )
+                        if (state != AppState.LOADING) {
+                            Icon(
+                                Icons.Outlined.Refresh,
+                                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
+                                contentDescription = "Refresh",
+                                tint = MaterialTheme.colors.onSecondary
+                            )
+                        } else {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(alignment = Alignment.CenterVertically)
+                                    .scale(.6f)
+                            )
+                        }
                     }
 
                     Row(modifier = Modifier
