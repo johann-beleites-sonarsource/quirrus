@@ -107,11 +107,12 @@ fun WallboardApp() {
             { branch, state -> branchState[branch] = state },
             { branch, error -> errors[branch] = error }
         )
-        updateRulesWithDiff(
-            DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs),
-            tasksWithDiffs::put,
-            tasksWithDiffs::remove
-        )
+    }
+
+    DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs).let {
+        if (it.isNotEmpty()) {
+            updateRulesWithDiff(it, tasksWithDiffs::put, tasksWithDiffs::remove)
+        }
     }
 
     fun startBackgroundRefreshPoll() {
@@ -259,7 +260,7 @@ fun WallboardApp() {
 
                 Column(modifier = Modifier.weight(0.9f)) {
                     Row {
-                        if (state == AppState.INIT){
+                        if (state == AppState.INIT) {
                             triggerReload()
                             return@Row
                         }

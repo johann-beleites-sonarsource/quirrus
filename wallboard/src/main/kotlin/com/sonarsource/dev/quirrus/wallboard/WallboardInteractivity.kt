@@ -182,28 +182,37 @@ internal fun updateRulesWithDiff(
     addTaskDiff: (String, TaskDiffData?) -> Unit,
     removeTaskDiff: (String) -> Unit,
 ) {
-    for (task in taskList) {
-        addTaskDiff(task.id, null)
-        GlobalScope.async {
-            val job = launch {
-                logDownloader.downloadLogsForTasks(listOf(task), "snapshot_generation.log").firstOrNull()?.let { (_, log) ->
-                    val rules = ruleRegex.findAll(log).mapNotNull {
-                        val key = it.groups["ruleKey"]?.value ?: return@mapNotNull null
-                        val number = it.groups["number"]?.value?.toIntOrNull() ?: return@mapNotNull null
-                        key to number
-                    }.toMap()
+    GlobalScope.launch {
+        coroutineScope {
+            taskList.map { task ->
+                addTaskDiff(task.id, null)
+                launch {
+                    runCatching {
+                        logDownloader.downloadLogsForTasks(listOf(task), "snapshot_generation.log").firstOrNull()?.let { (_, log) ->
+                            val rules = ruleRegex.findAll(log).mapNotNull {
+                                val key = it.groups["ruleKey"]?.value ?: return@mapNotNull null
+                                val number = it.groups["number"]?.value?.toIntOrNull() ?: return@mapNotNull null
+                                key to number
+                            }.toMap()
 
-                    val (newCount, absentCount) = taskDiffGeneralInfoRegex.find(log)?.let {
-                        it.groups["newCount"]?.value?.toIntOrNull() to it.groups["absentCount"]?.value?.toIntOrNull()
-                    } ?: null to null
+                            val (newCount, absentCount) = taskDiffGeneralInfoRegex.find(log)?.let {
+                                it.groups["newCount"]?.value?.toIntOrNull() to it.groups["absentCount"]?.value?.toIntOrNull()
+                            } ?: null to null
 
-                    addTaskDiff(task.id, TaskDiffData(rules, newCount, absentCount))
+                            TaskDiffData(rules, newCount, absentCount)
+                        }
+                    }.onFailure {
+                        removeTaskDiff(task.id)
+                    }.onSuccess {
+                        if (it != null) {
+                            addTaskDiff(task.id, it)
+                        } else {
+                            removeTaskDiff(task.id)
+                        }
+                    }
                 }
-            }
-            delay(30_000)
-            if (!job.isCompleted) {
-                job.cancel()
-                removeTaskDiff(task.id)
+            }.forEach {
+                it.join()
             }
         }
     }
