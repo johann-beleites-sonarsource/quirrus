@@ -8,21 +8,19 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerIconDefaults
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SideTab(onClick: () -> Unit, text: String, bgColor: Color, selected: Boolean) {
     Button(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .pointerHoverIcon(PointerIconDefaults.Hand)
+            .pointerHoverIcon(PointerIcon.Hand)
             .height(50.dp)
             .padding(bottom = 1.dp),
         colors = ButtonDefaults.buttonColors(
