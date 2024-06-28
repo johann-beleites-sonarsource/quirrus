@@ -19,7 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerIconDefaults
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -128,7 +128,7 @@ fun TaskList(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(start = 20.dp)
-                                        .pointerHoverIcon(PointerIconDefaults.Hand),
+                                        .pointerHoverIcon(PointerIcon.Hand),
                                 ) {
                                     val logsArg = (task.firstFailedCommand?.name
                                         ?: if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) {
@@ -176,7 +176,7 @@ fun TaskList(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(start = 20.dp)
-                                            .pointerHoverIcon(PointerIconDefaults.Hand),
+                                            .pointerHoverIcon(PointerIcon.Hand),
                                     ) {
                                         openWebpage(URI("https://api.cirrus-ci.com/v1/artifact/task/${task.id}/diff_report.zip"))
                                     }
@@ -223,7 +223,7 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
             text,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .pointerHoverIcon(PointerIconDefaults.Hand),
+                .pointerHoverIcon(PointerIcon.Hand),
         ) {
             lastDifferentBuild.tasks.firstOrNull { it.name == task.taskReruns.first().name }?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
