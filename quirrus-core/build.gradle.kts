@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.openjfx.javafxplugin")
+    id("com.expediagroup.graphql") version "8.0.0"
 }
 
 val javaTarget: String by project
@@ -38,4 +39,12 @@ dependencies {
 javafx {
     version = javaTarget
     modules = listOf("javafx.controls", "javafx.swing", "javafx.web", "javafx.graphics")
+}
+
+tasks {
+    graphqlIntrospectSchema {
+        endpoint.set("https://api.cirrus-ci.com/graphql")
+        outputFile.set(file("src/main/resources/schema.graphql"))
+        headers.set(mapOf("Cookie" to (System.getenv()["CIRRUS_COOKIE"] ?: "")))
+    }
 }
