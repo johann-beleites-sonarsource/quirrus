@@ -122,6 +122,7 @@ type Build implements Node {
   notifications: [Notification!]!
   parsingResult: ParsingResult
   pullRequest: Long
+  pullRequestDraft: Boolean
   pullRequestLabels: [String!]!
   repository: Repository!
   repositoryId: ID!
