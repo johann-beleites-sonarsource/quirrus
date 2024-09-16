@@ -1,3 +1,4 @@
+import com.expediagroup.graphql.plugin.gradle.config.GraphQLScalar
 import com.expediagroup.graphql.plugin.gradle.config.GraphQLSerializer
 import com.expediagroup.graphql.plugin.gradle.tasks.GraphQLGenerateClientTask
 import com.expediagroup.graphql.plugin.gradle.tasks.GraphQLIntrospectSchemaTask
@@ -61,4 +62,8 @@ val graphqlGenerateClient by tasks.getting(GraphQLGenerateClientTask::class) {
     schemaFile.set(graphqlIntrospectSchema.outputFile)
     // make sure to run client generation after introspection task
     dependsOn("graphqlIntrospectSchema")
+
+    // generate client for all queries and mutations
+    queryFileDirectory.set(file("src/main/resources/queries"))
+    //queryFiles.from(fileTree("src/main/resources/queries"))
 }
