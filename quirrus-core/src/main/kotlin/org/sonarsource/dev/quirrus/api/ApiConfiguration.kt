@@ -1,15 +1,15 @@
 package org.sonarsource.dev.quirrus.api
 
+import com.expediagroup.graphql.client.ktor.GraphQLKtorClient
+import com.expediagroup.graphql.client.types.GraphQLClientRequest
+import com.expediagroup.graphql.client.types.GraphQLClientResponse
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -17,9 +17,9 @@ import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.copyAndClose
 import kotlinx.serialization.json.Json
-import me.lazmaid.kraph.Kraph
 import okhttp3.ConnectionPool
 import org.sonarsource.dev.quirrus.common.Logger
+import java.net.URL
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
@@ -61,10 +61,13 @@ class ApiConfiguration(
         }
     }
 
-    suspend fun post(body: Kraph) = httpClient.post(apiUrl) {
-        authenticator?.invoke(this)
-        contentType(ContentType.Application.Json)
-        setBody(body.toRequestString())
+    val graphQlClient = GraphQLKtorClient(url = URL("https://api.cirrus-ci.com/graphql"), httpClient = httpClient)
+
+    suspend fun <T : Any> sendGraphQlRequest(request: GraphQLClientRequest<T>): GraphQLClientResponse<T> {
+        return graphQlClient.execute(request) {
+            authenticator?.invoke(this)
+            contentType(ContentType.Application.Json)
+        }
     }
 
     suspend fun get(url: String) = httpClient.get(url) {
@@ -73,3 +76,5 @@ class ApiConfiguration(
 
     suspend fun downloadToFile(url: String, file: Path) = get(url).bodyAsChannel().copyAndClose(file.toFile().writeChannel())
 }
+
+suspend fun <T : Any> GraphQLClientRequest<T>.exec(apiConfiguration: ApiConfiguration) = apiConfiguration.sendGraphQlRequest(this)

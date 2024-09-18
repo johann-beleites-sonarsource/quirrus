@@ -1,0 +1,32 @@
+query getTasks($repoId: ID!, $branchName: String, $numberOfLatestBuilds: Int! = 1, $beforeTimestamp: String = null) {
+    repository(id: $repoId) {
+        builds(last: $numberOfLatestBuilds, before: $beforeTimestamp, branch: $branchName) {
+            edges {
+                node {
+                    id
+                    buildCreatedTimestamp
+                    changeTimestamp
+                    branch
+                    tasks {
+                        name
+                        id
+                        creationTimestamp
+                        status
+                        automaticReRun
+                        firstFailedCommand {
+                            name
+                            durationInSeconds
+                        }
+                        artifacts {
+                            name
+                            files {
+                                path
+                                size
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

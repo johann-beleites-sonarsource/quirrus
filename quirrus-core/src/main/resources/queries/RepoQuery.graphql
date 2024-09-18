@@ -1,0 +1,5 @@
+query getRepoId($repoName: String!) {
+    ownerRepository(name: $repoName, platform: "github", owner: "SonarSource") {
+        id
+    }
+}

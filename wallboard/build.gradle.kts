@@ -13,7 +13,6 @@ val javaFxVersion: String by project
 repositories {
     google()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-    jcenter()
 }
 
 dependencies {
@@ -25,6 +24,9 @@ dependencies {
     val ktor_version: String by project
     implementation("io.ktor:ktor-client-core:$ktor_version")
     implementation("io.ktor:ktor-client-cio:$ktor_version")
+
+    implementation("com.expediagroup:graphql-kotlin-ktor-client:8.0.0")
+
 }
 
 javafx {

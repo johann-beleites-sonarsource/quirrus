@@ -1,5 +1,7 @@
 package org.sonarsource.dev.quirrus
 
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build as BuildNode
+
 import kotlin.system.exitProcess
 
 val buildWithLastNumberParserRegex = "(?<branch>[^~]+)(~(?<number>[0-9]*))?".toRegex()

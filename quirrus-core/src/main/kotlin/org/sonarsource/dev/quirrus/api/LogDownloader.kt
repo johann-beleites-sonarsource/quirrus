@@ -1,16 +1,15 @@
 package org.sonarsource.dev.quirrus.api
 
-import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.request
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import org.sonarsource.dev.quirrus.BuildNode
-import org.sonarsource.dev.quirrus.RepositoryApiResponse
 import org.sonarsource.dev.quirrus.RequestBuilder
-import org.sonarsource.dev.quirrus.Task
+import org.sonarsource.dev.quirrus.generated.graphql.GetTasks
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import java.io.File
 import java.nio.file.Path
 import java.text.SimpleDateFormat
@@ -46,13 +45,11 @@ class LogDownloader(private val apiConfiguration: ApiConfiguration) {
     }
 
     suspend fun getLastNBuilds(repositoryId: String, branch: String?, numberOfBuilds: Int, beforeTimestamp: Long? = null) =
-        apiConfiguration.post(RequestBuilder.tasksQuery(repositoryId, branch, numberOfBuilds, beforeTimestamp)).let {
-            it to it.body<RepositoryApiResponse>()
-        }
+        GetTasks(variables = GetTasks.Variables(repositoryId, branch, numberOfBuilds, beforeTimestamp?.toString())).exec(apiConfiguration)
 
 
     suspend fun downloadLogs(
-        taskIds: List<Pair<Task, BuildNode?>>,
+        taskIds: List<Pair<Task, Build?>>,
         dateFormat: SimpleDateFormat,
         logFileName: String,
         targetDirectory: Path
