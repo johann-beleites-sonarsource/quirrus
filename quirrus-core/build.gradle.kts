@@ -19,7 +19,6 @@ val javaTarget: String by project
 repositories {
     google()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-    jcenter()
 }
 
 dependencies {

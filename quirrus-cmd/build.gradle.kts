@@ -37,7 +37,6 @@ tasks.getByName<Test>("test") {
 }
 
 repositories {
-    jcenter()
     google()
 }
 
