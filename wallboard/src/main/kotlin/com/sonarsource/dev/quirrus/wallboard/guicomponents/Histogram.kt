@@ -29,7 +29,7 @@ import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.jetbrains.skia.Font
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.TextLine
-import org.sonarsource.dev.quirrus.BuildNode
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -41,7 +41,7 @@ val timeOnly = SimpleDateFormat("HH:mm")
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun Histogram(
-    taskHistoryWithBuildNode: List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>,
+    taskHistoryWithBuildNode: List<Pair<Build, Map<Status, List<EnrichedTask>>>>,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {

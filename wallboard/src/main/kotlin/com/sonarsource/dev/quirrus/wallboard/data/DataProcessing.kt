@@ -1,18 +1,18 @@
 package com.sonarsource.dev.quirrus.wallboard.data
 
-import org.sonarsource.dev.quirrus.BuildNode
-import org.sonarsource.dev.quirrus.Builds
-import org.sonarsource.dev.quirrus.Task
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 
 object DataProcessing {
 
-    internal fun processData(buildsByBranch: Map<String, Builds?>) =
+    internal fun processData(buildsByBranch: Map<String, RepositoryBuildsConnection?>) =
         buildsByBranch.map { (branch, builds) ->
             if (builds == null || builds.edges.isEmpty()) return@map branch to null
             branch to processBuildData(builds)
         }.toMap()
 
-    internal fun processBuildData(builds: Builds): List<BuildWithTasks> {
+    internal fun processBuildData(builds: RepositoryBuildsConnection): List<BuildWithTasks> {
 
         val enrichedBuilds = builds.edges.map {
             it.node
@@ -47,7 +47,7 @@ object DataProcessing {
     /**
      * TODO
      */
-    internal fun processData(history: List<BuildWithTasks>): List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>> {
+    internal fun processData(history: List<BuildWithTasks>): List<Pair<Build, Map<Status, List<EnrichedTask>>>> {
 
         var maxFailed = 0
         var maxOther = 0
@@ -85,7 +85,7 @@ object DataProcessing {
     }
 
 internal fun extractTasksThatRequireLazyLoadingOfDiffRules(
-    dataByBranch: Map<String, List<Pair<BuildNode, Map<Status, List<EnrichedTask>>>>>,
+    dataByBranch: Map<String, List<Pair<Build, Map<Status, List<EnrichedTask>>>>>,
     tasksWithDiffs: Map<String, *>,
 ): List<Task> =
     dataByBranch.flatMap { (_, tasks) ->

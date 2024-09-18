@@ -1,7 +1,7 @@
 package com.sonarsource.dev.quirrus.wallboard.data
 
-import org.sonarsource.dev.quirrus.BuildNode
-import org.sonarsource.dev.quirrus.Task
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build as BuildNode
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 
 data class BuildWithTasks(val node: BuildNode, val tasks: Map<String, EnrichedTask>)
 

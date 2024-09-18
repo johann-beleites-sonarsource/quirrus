@@ -3,19 +3,17 @@ package com.sonarsource.dev.quirrus.wallboard
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.sonarsource.dev.quirrus.Builds
-import org.sonarsource.dev.quirrus.Task
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
@@ -93,7 +91,7 @@ private suspend fun fetchDataIncrementallyByBranch(
 
         val numberOfBuildsToFetch = 10
         val fetchedBuildsPerBranch = branches.associateWith { AtomicInteger(0) }
-        val dataInputChannel = Channel<Pair<String, Builds?>>()
+        val dataInputChannel = Channel<Pair<String, RepositoryBuildsConnection?>>()
         val nextRequestChannel = Channel<Pair<String, Long>>()
 
         val updaterJob = launch {
@@ -110,7 +108,7 @@ private suspend fun fetchDataIncrementallyByBranch(
 
                 if (fetchedBuildsPerBranch[branch]!!.addAndGet(builds?.edges?.size ?: 0) < numberOfBuildsToFetch) {
                     builds?.edges?.minOf { it.node.changeTimestamp }?.let { timestamp ->
-                        nextRequestChannel.send(branch to timestamp)
+                        nextRequestChannel.send(branch to timestamp.toLong())
                     }
                 }
 

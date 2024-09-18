@@ -30,7 +30,7 @@ import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
-import org.sonarsource.dev.quirrus.BuildNode
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -39,10 +39,9 @@ import java.util.Locale
 
 private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefault())
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TaskList(
-    buildNodeTasks: Pair<BuildNode, Map<Status, List<EnrichedTask>>>,
+    buildNodeTasks: Pair<Build, Map<Status, List<EnrichedTask>>>,
     verticalScrollState: ScrollState,
     tasksWithDiffs: Map<String, TaskDiffData?>
 ) {

@@ -35,7 +35,6 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
 
-    implementation("me.lazmaid.kraph:kraph:0.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     implementation("com.github.ajalt.clikt:clikt:3.4.0")
@@ -65,5 +64,6 @@ val graphqlGenerateClient by tasks.getting(GraphQLGenerateClientTask::class) {
 
     // generate client for all queries and mutations
     queryFileDirectory.set(file("src/main/resources/queries"))
-    //queryFiles.from(fileTree("src/main/resources/queries"))
+
+    customScalars.set(listOf(GraphQLScalar("Long", "kotlin.Long", "org.sonarsource.dev.quirrus.graphql.converter.LongScalarConverter")))
 }
