@@ -108,7 +108,7 @@ private suspend fun fetchDataIncrementallyByBranch(
 
                 if (fetchedBuildsPerBranch[branch]!!.addAndGet(builds?.edges?.size ?: 0) < numberOfBuildsToFetch) {
                     builds?.edges?.minOf { it.node.changeTimestamp }?.let { timestamp ->
-                        nextRequestChannel.send(branch to timestamp.toLong())
+                        nextRequestChannel.send(branch to timestamp)
                     }
                 }
 

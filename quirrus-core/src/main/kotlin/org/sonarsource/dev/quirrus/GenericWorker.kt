@@ -50,7 +50,7 @@ class GenericWorker(private val apiConfig: ApiConfiguration) {
 
     private fun getBuildId(result: GetTasks.Result): String = getBuildNode(result).id
 
-    private fun getBuildDate(result: GetTasks.Result): Long = getBuildNode(result).buildCreatedTimestamp.toLong()
+    private fun getBuildDate(result: GetTasks.Result): Long = getBuildNode(result).buildCreatedTimestamp
 
     private fun getBuildNode(result: GetTasks.Result) =
         result.repository?.builds?.edges?.let { it[it.size - 1].node }

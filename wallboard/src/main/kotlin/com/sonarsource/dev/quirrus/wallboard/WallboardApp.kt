@@ -311,7 +311,7 @@ fun WallboardApp() {
                                         amountSucceeded,
                                         amountFailed,
                                         totalAmount,
-                                        selectedTasks.first.buildCreatedTimestamp.toLong(),
+                                        selectedTasks.first.buildCreatedTimestamp,
                                         backgroundLoadingInProgress,
                                     )
 
