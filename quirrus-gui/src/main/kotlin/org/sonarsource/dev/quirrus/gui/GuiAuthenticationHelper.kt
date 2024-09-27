@@ -13,6 +13,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
@@ -148,6 +149,7 @@ class GuiAuthenticationHelper(
                                 }
                                 engine.loadWorker.exceptionProperty().addListener { _, _, newError ->
                                     println("page load error : $newError")
+                                    newError.printStackTrace()
                                 }
                                 jfxPanel.scene = scene
                                 engine.load("https://api.cirrus-ci.com/redirect/auth/github") // can be a html document from resources ..
@@ -175,7 +177,6 @@ fun ComposeJFXPanel(
 ) {
     val jPanel = remember { JPanel() }
     val density = LocalDensity.current.density
-
     Layout(
         content = {},
         modifier = Modifier.onGloballyPositioned { childCoordinates ->
@@ -193,8 +194,9 @@ fun ComposeJFXPanel(
         },
         measurePolicy = { _, _ -> layout(0, 0) {} })
 
+    SwingPanel(factory = { jPanel }, modifier = Modifier.fillMaxSize())
+
     DisposableEffect(jPanel) {
-        composeWindow.add(jPanel)
         jPanel.layout = BorderLayout(0, 0)
         jPanel.add(jfxPanel)
         onCreate()
