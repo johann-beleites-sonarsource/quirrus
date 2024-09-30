@@ -1,6 +1,6 @@
 package com.sonarsource.dev.quirrus.wallboard
 
-import java.nio.file.Path
+import org.sonarsource.dev.quirrus.QuirrusConfig
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createFile
 import kotlin.io.path.exists
@@ -9,7 +9,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 object WallboardConfig {
-    private val configFile = Path.of(System.getenv("HOME"), ".quirrus", "branches.conf").also { file ->
+    private val configFile = QuirrusConfig.directory.resolve("branches.conf").also { file ->
         if (!file.parent.exists()) {
             file.parent.createDirectories()
         }

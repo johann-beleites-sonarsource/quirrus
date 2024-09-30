@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
+import org.sonarsource.dev.quirrus.QuirrusConfig
 import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.Authentication.authenticateWithConfigFile
 import java.nio.file.Path
@@ -15,7 +16,7 @@ val API_CONF = ApiConfiguration(
     requestTimeoutOverride = 30_000
 )
 
-val AUTH_CONF_FILE = Path.of(System.getenv("HOME"), ".quirrus", "auth.conf")
+val AUTH_CONF_FILE: Path = QuirrusConfig.directory.resolve("auth.conf")
 
 private const val MIN_WINDOW_WIDTH = 1400
 private const val MIN_WINDOW_HEIGHT = 900

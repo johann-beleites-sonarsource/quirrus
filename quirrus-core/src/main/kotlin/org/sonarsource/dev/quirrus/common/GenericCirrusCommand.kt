@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.path
 import org.sonarsource.dev.quirrus.CliLogger
+import org.sonarsource.dev.quirrus.QuirrusConfig
 import java.nio.file.Path
 
 abstract class GenericCirrusCommand : CliktCommand() {
@@ -30,7 +31,7 @@ abstract class GenericCirrusCommand : CliktCommand() {
         help = "You can store cirrus credentials (cirrusUserId and cirrusAuthToken) in a file and use that. This option will be used if " +
                 "no api token or cookies are provided explicitly."
     ).path(mustExist = false, canBeDir = false, mustBeReadable = true)
-        .default(Path.of(System.getenv("HOME"), ".quirrus", "auth.conf"))
+        .default(QuirrusConfig.directory.resolve("auth.conf"))
 
     val verbose by option("-v", "--verbose").flag(default = false)
 
