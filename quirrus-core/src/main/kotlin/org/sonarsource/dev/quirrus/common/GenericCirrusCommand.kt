@@ -13,7 +13,7 @@ import java.nio.file.Path
 
 abstract class GenericCirrusCommand : CliktCommand() {
     val apiUrl by option(
-        "--api-url",
+        "TESTTESTTEST",
         help = "Override the default API endpoint"
     ).default("https://api.cirrus-ci.com/graphql")
 
