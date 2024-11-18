@@ -31,6 +31,7 @@ internal fun reloadData(
     saveConfig: () -> Unit,
     setBranchState: (String, AppState) -> Unit,
     setBranchError: (String, String) -> Unit,
+    cancelled: () -> Boolean,
 ) {
     if (currentState != AppState.LOADING) {
         if (repoTextFieldVal.isBlank()) {
@@ -58,7 +59,7 @@ internal fun reloadData(
                     }
                 }
 
-                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState)
+                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState, cancelled)
 
             }.onFailure { e ->
                 val errorMsg = when (e) {
@@ -84,6 +85,7 @@ private suspend fun fetchDataIncrementallyByBranch(
     branches: List<String>,
     lastTasks: MutableMap<String, List<BuildWithTasks>?>,
     setBranchState: (String, AppState) -> Unit,
+    cancelled: () -> Boolean,
 ) {
     // First get only the last 2 builds for each branch
     coroutineScope {
@@ -96,7 +98,6 @@ private suspend fun fetchDataIncrementallyByBranch(
 
         val updaterJob = launch {
             dataInputChannel.consumeEach { (branch, builds) ->
-
                 if (builds != null) {
                     DataProcessing.processBuildData(builds).also {
                         lastTasks[branch] = (lastTasks[branch] ?: emptyList()) + it
@@ -107,7 +108,7 @@ private suspend fun fetchDataIncrementallyByBranch(
                 }
 
                 if (fetchedBuildsPerBranch[branch]!!.addAndGet(builds?.edges?.size ?: 0) < numberOfBuildsToFetch) {
-                    builds?.edges?.minOf { it.node.changeTimestamp }?.let { timestamp ->
+                    builds?.edges?.minOfOrNull { it.node.changeTimestamp }?.let { timestamp ->
                         nextRequestChannel.send(branch to timestamp)
                     }
                 }
@@ -134,7 +135,7 @@ private suspend fun fetchDataIncrementallyByBranch(
 
 
 
-        while (fetchedBuildsPerBranch.values.any { it.get() < numberOfBuildsToFetch }) {
+        while (fetchedBuildsPerBranch.values.any { it.get() < numberOfBuildsToFetch } && !cancelled()) {
             delay(500)
         }
         fetcherJob.cancel()
@@ -148,6 +149,7 @@ internal fun launchBackgroundRefreshPoll(
     getCurrentRunId: () -> Long,
     branch: String,
     repoTextFieldVal: String,
+    getAppState: () -> AppState,
     setBackgroundLoadingInProgress: (Boolean) -> Unit,
     setResult: (Map<String, List<BuildWithTasks>?>) -> Unit,
 ) = GlobalScope.launch {
@@ -158,13 +160,14 @@ internal fun launchBackgroundRefreshPoll(
         return@launch
     }
 
-
     while (getCurrentRunId() <= runId) {
-        setBackgroundLoadingInProgress(true)
-        DataProcessing.processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 8)).also {
-            if (getCurrentRunId() == runId) {
-                setResult(it)
-                setBackgroundLoadingInProgress(false)
+        if (getAppState() == AppState.NONE) {
+            setBackgroundLoadingInProgress(true)
+            DataProcessing.processData(cirrusData.getLastPeachBuilds(repoId, listOf(branch), 1)).also {
+                if (getCurrentRunId() == runId) {
+                    setResult(it)
+                    setBackgroundLoadingInProgress(false)
+                }
             }
         }
         delay(10_000)
