@@ -66,10 +66,14 @@ class GuiAuthenticationHelper(
             """.trimIndent()
         }
 
-        runBlocking {
-            Common(apiConfiguration).fetchAuthenticatedUserId()
-        }?.let { userId ->
+        runCatching {
+            runBlocking {
+                Common(apiConfiguration).fetchAuthenticatedUserId()
+            }
+        }.onSuccess { userId ->
             apiConfiguration.logger?.info { "Successfully authenticated as user $userId" }
+        }.onFailure { e ->
+            apiConfiguration.logger?.error("Failed to authenticate: ${e.message}")
         }
     }
 
