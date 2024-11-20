@@ -1,7 +1,11 @@
 package com.sonarsource.dev.quirrus.wallboard.data
 
-import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build as BuildNode
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build as BuildNode
+
+enum class DataItemState {
+    PENDING, LOADING, DONE, ERROR
+}
 
 data class BuildWithTasks(val node: BuildNode, val tasks: Map<String, EnrichedTask>)
 

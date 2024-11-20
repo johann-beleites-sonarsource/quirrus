@@ -21,10 +21,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -65,6 +67,11 @@ fun WallboardApp() {
         if (tasks == null) null
         else branch to DataProcessing.processData(tasks)
     }.toMap()
+
+    val displayItems by remember {
+        mutableStateOf(mutableStateMapOf<String, SnapshotStateList<DataItemToDisplay>>())
+    }
+
     var selectedTab: String? by remember { mutableStateOf(null) }
     var branches by remember { mutableStateOf(branches) }
     var branchesTextFieldVal by remember { mutableStateOf(WallboardConfig.branches.joinToString(",")) }
@@ -94,20 +101,25 @@ fun WallboardApp() {
             // Cancel
             loadingCancelled = true
         } else {
-            lastTasks.clear()
-            lastTasks.putAll(branches.map { it to null })
+            displayItems.clear()
+            displayItems.putAll(branches.map { branch ->
+                branch to mutableStateListOf()
+            })
+
+            //lastTasks.clear()
+            //lastTasks.putAll(branches.map { it to null })
             branchState.clear()
             branchState.putAll(branches.map { it to AppState.LOADING })
             if (selectedTab !in branches) {
                 selectedTab = branches.firstOrNull()
             }
-            reloadData(
+            /*reloadData(
                 state,
                 repoTextFieldVal,
                 branches,
                 selectedTab,
                 lastTasks,
-                { state = it ; loadingCancelled = false },
+                { state = it; loadingCancelled = false },
                 { error = it },
                 { repoTextFieldVal = it },
                 { selectedTab = it },
@@ -115,6 +127,10 @@ fun WallboardApp() {
                 { branch, state -> branchState[branch] = state },
                 { branch, error -> errors[branch] = error },
                 { loadingCancelled },
+            )*/
+            reloadData(
+                branches,
+                { branch, builds  -> displayItems[branch] = mutableStateListOf(*builds.toTypedArray()) },
             )
         }
     }
@@ -241,13 +257,15 @@ fun WallboardApp() {
                         .padding(start = 5.dp, end = 5.dp, top = 5.dp)
                         .fillMaxWidth()
                         .clickable(enabled = state in listOf(AppState.LOADING, AppState.NONE) && !loadingCancelled) { triggerReload() }
-                        .background(color = if (state != AppState.LOADING) {
-                            MaterialTheme.colors.secondary
-                        } else if (!loadingCancelled) {
-                            Color.Red.copy(alpha = .3f)
-                        } else {
-                            Color.LightGray
-                        }),
+                        .background(
+                            color = if (state != AppState.LOADING) {
+                                MaterialTheme.colors.secondary
+                            } else if (!loadingCancelled) {
+                                Color.Red.copy(alpha = .3f)
+                            } else {
+                                Color.LightGray
+                            }
+                        ),
                         horizontalArrangement = Arrangement.Center
                     ) {
                         if (state != AppState.LOADING) {

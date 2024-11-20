@@ -1,0 +1,12 @@
+query getLastNBuilds($repoId: ID!, $branchName: String, $numberOfLatestBuilds: Int!, $beforeTimestamp: String = null) {
+    repository(id: $repoId) {
+        builds(last: $numberOfLatestBuilds, before: $beforeTimestamp, branch: $branchName) {
+            edges {
+                node {
+                    id
+                    buildCreatedTimestamp
+                }
+            }
+        }
+    }
+}

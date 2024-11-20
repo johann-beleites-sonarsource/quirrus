@@ -1,7 +1,9 @@
 package com.sonarsource.dev.quirrus.wallboard
 
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
+import com.sonarsource.dev.quirrus.wallboard.data.DataItemState
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
+import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -12,11 +14,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
+import org.sonarsource.dev.quirrus.generated.graphql.ID
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
+import kotlin.random.Random
+
+internal fun reloadData(
+    branches: List<String>,
+    setTabDisplayItems: (String, List<DataItemToDisplay>) -> Unit,
+) {
+    branches.forEach { branch ->
+        setTabDisplayItems(branch, (1..10).map { index -> DataItemToDisplay(branch, Random.nextLong().toString(), Random.nextLong(), index) })
+    }
+}
 
 internal fun reloadData(
     currentState: AppState,
@@ -59,7 +72,7 @@ internal fun reloadData(
                     }
                 }
 
-                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState, cancelled)
+                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState, setBranchError, cancelled)
 
             }.onFailure { e ->
                 val errorMsg = when (e) {
@@ -85,6 +98,7 @@ private suspend fun fetchDataIncrementallyByBranch(
     branches: List<String>,
     lastTasks: MutableMap<String, List<BuildWithTasks>?>,
     setBranchState: (String, AppState) -> Unit,
+    setBranchError: (String, String) -> Unit,
     cancelled: () -> Boolean,
 ) {
     // First get only the last 2 builds for each branch
@@ -127,7 +141,13 @@ private suspend fun fetchDataIncrementallyByBranch(
 
         branches.map { branch ->
             async {
-                dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 2))
+                runCatching {
+                    dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 2))
+                }.onFailure { e ->
+                    setBranchState(branch, AppState.ERROR)
+                    setBranchError(branch, e.stackTraceToString())
+                    e.printStackTrace(System.err)
+                }
             }
         }.forEach {
             it.await()
@@ -223,5 +243,41 @@ fun authenticate(triggerReload: () -> Unit) {
     GlobalScope.launch {
         GuiAuthenticationHelper(API_CONF, AUTH_CONF_FILE).AuthWebView(AUTH_CONF_FILE)
         triggerReload()
+    }
+}
+
+class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTimestamp: Long, val index: Int, successorDataItem: DataItemToDisplay? = null) {
+    /*companion object {
+        private val nextId = AtomicLong(0)
+    }
+
+    val id = nextId.getAndIncrement()*/
+
+    var successorDataItem: DataItemToDisplay? = successorDataItem
+        set(value) {
+            if (field != value) {
+                field?.reprocessData(null)
+                value?.reprocessData(this)
+                field = value
+            }
+        }
+    var state: DataItemState = DataItemState.PENDING
+    var build: BuildWithTasks? = null
+        set(value) {
+            field = value
+            successorDataItem?.reprocessData(this)
+        }
+
+    var processedTasks: Map<String, EnrichedTask> = emptyMap()
+        private set
+
+    private fun reprocessData(reference: DataItemToDisplay?) {
+        build?.tasks
+        if (reference == null) {
+            
+        } else {
+
+        }
+        successorDataItem?.reprocessData(this)
     }
 }
