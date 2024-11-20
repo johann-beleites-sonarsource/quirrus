@@ -4,6 +4,8 @@ import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.DataItemState
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
 import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
+import com.sonarsource.dev.quirrus.wallboard.data.Status
+import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -17,6 +19,7 @@ import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.generated.graphql.ID
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
+import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
@@ -246,6 +249,8 @@ fun authenticate(triggerReload: () -> Unit) {
     }
 }
 
+typealias TaskReruns = List<Task>
+
 class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTimestamp: Long, val index: Int, successorDataItem: DataItemToDisplay? = null) {
     /*companion object {
         private val nextId = AtomicLong(0)
@@ -262,22 +267,56 @@ class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTim
             }
         }
     var state: DataItemState = DataItemState.PENDING
-    var build: BuildWithTasks? = null
+    var build: Build? = null
         set(value) {
             field = value
             successorDataItem?.reprocessData(this)
         }
 
-    var processedTasks: Map<String, EnrichedTask> = emptyMap()
-        private set
-
     private fun reprocessData(reference: DataItemToDisplay?) {
-        build?.tasks
-        if (reference == null) {
-            
-        } else {
+        val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
+            it.name
+        }?.mapValues {
+            it.value.sortedBy { run -> run.creationTimestamp } as TaskReruns
+        } ?: return
 
+        if (reference == null) {
+
+        } else {
+            build?.tasks.first()
+
+            /*return tasks.mapIndexed { i, task ->
+
+
+
+                task.
+
+                var failed = 0
+                var other = 0
+
+                val grouped = taskMap.values.groupBy { task ->
+                    val status = StatusCategory.ofCirrusTask(task.latestRerun)
+
+                    when {
+                        status.isFailingState() -> failed++
+                        else -> other++
+                    }
+
+                    val isNewStatus = filteredHistory.getOrNull(i + 1)?.tasks?.get(task.latestRerun.name)?.latestRerun?.let { lastRun ->
+                        lastRun.status != task.latestRerun.status || StatusCategory.ofCirrusTask(lastRun) != status
+                    } ?: (i < filteredHistory.size - 1)
+
+                    Status(status, isNewStatus)
+                }
+
+                if (failed > maxFailed) maxFailed = failed
+                if (other > maxOther) maxOther = other
+
+                build to grouped
+            }*/
         }
         successorDataItem?.reprocessData(this)
     }
 }
+
+data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: ID)
