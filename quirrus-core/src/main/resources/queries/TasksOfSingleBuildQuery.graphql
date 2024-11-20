@@ -1,0 +1,26 @@
+query getTasksOfSingleBuild($buildId: ID!) {
+    build(id: $buildId) {
+        id
+        buildCreatedTimestamp
+        changeTimestamp
+        branch
+        tasks {
+            name
+            id
+            creationTimestamp
+            status
+            automaticReRun
+            firstFailedCommand {
+                name
+                durationInSeconds
+            }
+            artifacts {
+                name
+                files {
+                    path
+                    size
+                }
+            }
+        }
+    }
+}

@@ -4,6 +4,7 @@ import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -17,6 +18,63 @@ import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
+
+internal fun reloadData(
+    repoId: String,
+    branches: List<String>,
+    numberOfBuildsToLoad: Int,
+    appState: AppState,
+    buildDataManager: BuildDataManager,
+    setAppState: (AppState) -> Unit,
+    setTabDisplayItems: (String, List<BuildDataItem>) -> Unit,
+): Job? {
+    if (appState == AppState.LOADING) return null
+    setAppState(AppState.LOADING)
+
+
+    return GlobalScope.launch {
+        // 1. load only the build IDs of the last n builds for each branch. This is a relatively fast operation.
+        val lastNBuildsMetadata = getMetadataOnLastNBuilds(repoId, branches, numberOfBuildsToLoad)
+
+        // 2. Display the data
+        branches.forEach { branch ->
+            lastNBuildsMetadata[branch]?.let {
+                setTabDisplayItems(branch, it)
+            } ?: setTabDisplayItems(branch, emptyList())
+        }
+
+        // 3. launch the loading of the full build data for each build ID. Loading the data can take some time for builds with many tasks.
+        lastNBuildsMetadata.values.flatten().sortedByDescending { it.buildCreatedTimestamp }.let {
+            buildDataManager.load(it)
+        }
+    }
+}
+
+suspend fun getMetadataOnLastNBuilds(repoId: String, branches: List<String>, numberOfBuildsToLoad: Int) =
+    coroutineScope {
+        branches.associateWith { branch ->
+            async {
+                //log.debug("Loading metadata for branch $branch")
+                cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.sortedByDescending {
+                    it.node.buildCreatedTimestamp
+                }.fold(mutableListOf<PendingBuildData>()) { acc, buildEdge ->
+                    acc.apply {
+                        add(
+                            PendingBuildData(
+                                id = buildEdge.node.id,
+                                buildCreatedTimestamp = buildEdge.node.buildCreatedTimestamp,
+                                previousBuild = acc.lastOrNull()?.id
+                            )
+                        )
+                    }
+                }
+            }
+        }.mapValues { (_, deferred) ->
+            deferred.await()/*.also {
+                log.debug("Finished loading metadata for branch ${it.first().branch}")
+            }*/
+        }
+    }
 
 internal fun reloadData(
     currentState: AppState,
@@ -59,7 +117,7 @@ internal fun reloadData(
                     }
                 }
 
-                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState, cancelled)
+                fetchDataIncrementallyByBranch(repoId, branches, lastTasksAcc, setBranchState, setBranchError, cancelled)
 
             }.onFailure { e ->
                 val errorMsg = when (e) {
@@ -85,6 +143,7 @@ private suspend fun fetchDataIncrementallyByBranch(
     branches: List<String>,
     lastTasks: MutableMap<String, List<BuildWithTasks>?>,
     setBranchState: (String, AppState) -> Unit,
+    setBranchError: (String, String) -> Unit,
     cancelled: () -> Boolean,
 ) {
     // First get only the last 2 builds for each branch
@@ -127,7 +186,13 @@ private suspend fun fetchDataIncrementallyByBranch(
 
         branches.map { branch ->
             async {
-                dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 2))
+                runCatching {
+                    dataInputChannel.send(branch to cirrusData.getLastPeachBuilds(repoId, branch, 2))
+                }.onFailure { e ->
+                    setBranchState(branch, AppState.ERROR)
+                    setBranchError(branch, e.stackTraceToString())
+                    e.printStackTrace(System.err)
+                }
             }
         }.forEach {
             it.await()
@@ -225,3 +290,4 @@ fun authenticate(triggerReload: () -> Unit) {
         triggerReload()
     }
 }
+
