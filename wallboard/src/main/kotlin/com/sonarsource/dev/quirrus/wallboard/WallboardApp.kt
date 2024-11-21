@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.Checkbox
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -35,9 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.branches
 import com.sonarsource.dev.quirrus.wallboard.WallboardConfig.repo
-import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.CirrusData
-import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ErrorScreen
@@ -49,6 +46,9 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import org.sonarsource.dev.quirrus.generated.graphql.enums.TaskStatus
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
+import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import java.util.Locale
 
 var cirrusData = CirrusData(API_CONF)
@@ -57,16 +57,12 @@ internal enum class AppState {
     LOADING, ERROR, NONE, INIT
 }
 
+const val numberOfBuildsToLoad = 10
+
 @Composable
 @Preview
 fun WallboardApp() {
     var state by remember { mutableStateOf(AppState.INIT) }
-    var error by remember { mutableStateOf("Unknown") }
-    var lastTasks by remember { mutableStateOf(mutableStateMapOf<String, List<BuildWithTasks>?>()) }
-    var dataByBranch = lastTasks.mapNotNull { (branch, tasks) ->
-        if (tasks == null) null
-        else branch to DataProcessing.processData(tasks)
-    }.toMap()
 
     val displayItems by remember {
         mutableStateOf(mutableStateMapOf<String, SnapshotStateList<DataItemToDisplay>>())
@@ -80,7 +76,6 @@ fun WallboardApp() {
     val taskListScrollState = rememberScrollState(0)
     var autoRefresh by remember { mutableStateOf(WallboardConfig.autoRefreshEnabled) }
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
-    var lastSelectedTab: String? by remember { mutableStateOf(null) }
     var backgroundLoadingInProgress by remember { mutableStateOf(false) }
     val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
     val branchState by remember { mutableStateOf(mutableStateMapOf<String, AppState>()) }
@@ -129,19 +124,21 @@ fun WallboardApp() {
                 { loadingCancelled },
             )*/
             reloadData(
+                repoTextFieldVal,
                 branches,
-                { branch, builds  -> displayItems[branch] = mutableStateListOf(*builds.toTypedArray()) },
+                numberOfBuildsToLoad,
+                { branch, builds -> displayItems[branch] = mutableStateListOf(*builds.toTypedArray()) },
             )
         }
     }
 
-    DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs).let {
+    /*DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs).let {
         if (it.isNotEmpty()) {
             updateRulesWithDiff(it, tasksWithDiffs::put, tasksWithDiffs::remove)
         }
-    }
+    }*/ // FIXME
 
-    fun startBackgroundRefreshPoll() {
+    /*fun startBackgroundRefreshPoll() {
         val branch = selectedTab ?: return
         launchBackgroundRefreshPoll(
             backgroundRefreshCounter,
@@ -179,14 +176,14 @@ fun WallboardApp() {
         }
         saveConfig()
     }
-
-    if (selectedTab != null && lastSelectedTab != selectedTab) {
+*/
+    /*if (selectedTab != null && lastSelectedTab != selectedTab) {
         if (autoRefresh) {
             backgroundRefreshCounter++
             startBackgroundRefreshPoll()
         }
         lastSelectedTab = selectedTab
-    }
+    }*/
 
     MaterialTheme {
         Box {
@@ -205,7 +202,7 @@ fun WallboardApp() {
                                 .padding(bottom = 4.dp),
                             color = MaterialTheme.colors.onBackground
                         )
-                        StatusCategory.values().forEach { status ->
+                        StatusCategory.entries.forEach { status ->
                             Text(
                                 status.name.lowercase()
                                     .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
@@ -228,7 +225,7 @@ fun WallboardApp() {
                         }
                     )
 
-                    lastTasks.keys.sorted().forEach { branch ->
+                    displayItems.keys.sorted().forEach { branch ->
                         SideTab(
                             onClick = {
                                 clickPosition = -1f
@@ -238,7 +235,7 @@ fun WallboardApp() {
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
                             text = branch,
                             //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
-                            bgColor = (dataByBranch[branch]?.firstOrNull()?.second?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
+                            bgColor = (displayItems[branch]?.firstOrNull()?.tasksByStatus?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
                             selected = branch == selectedTab
                         )
                     }
@@ -303,7 +300,7 @@ fun WallboardApp() {
                         )
                     }
 
-                    Row(
+                    /*Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, end = 5.dp, top = 5.dp)
@@ -316,7 +313,7 @@ fun WallboardApp() {
                             onCheckedChange = { changeAutoReloadSetting() },
                         )
                         Text("Auto-refresh")
-                    }
+                    }*/
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
@@ -329,37 +326,37 @@ fun WallboardApp() {
                         when (branchState[selectedTab]) {
                             AppState.LOADING -> LoadingScreen()
                             AppState.ERROR -> ErrorScreen(errors[selectedTab] ?: "NULL")
-                            else -> dataByBranch[selectedTab]?.let { taskHistory ->
+                            else -> displayItems[selectedTab]?.let { tabDisplayItems ->
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(5.dp)
                                 ) {
                                     val clickedIndex = if (clickPosition >= 0) {
-                                        taskHistory.size - (taskHistory.size.toFloat() * clickPosition).toInt() - 1
+                                        tabDisplayItems.size - (tabDisplayItems.size.toFloat() * clickPosition).toInt() - 1
                                     } else {
                                         0
                                     }
 
-                                    if (taskHistory.isEmpty()) {
+                                    if (tabDisplayItems.isEmpty()) {
                                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                             Text("No data available", color = MaterialTheme.colors.error, fontWeight = FontWeight.Bold)
                                         }
                                         // return@let -- this creates a compilation runtime error. so instead we have an else clause
                                     } else {
 
-                                        val selectedTasks = taskHistory[clickedIndex]
-                                        val amountFailed = selectedTasks.second.filter {
+                                        val selectedTasks = displayItems[selectedTab]!![clickedIndex]//taskHistory[clickedIndex]
+                                        val amountFailed = selectedTasks.tasksByStatus.filter {
                                             it.key.status.isFailingState()
                                         }.map {
                                             it.value.size
                                         }.sum()
-                                        val amountSucceeded = selectedTasks.second.filter {
+                                        val amountSucceeded = selectedTasks.tasksByStatus.filter {
                                             it.key.status == StatusCategory.COMPLETED
                                         }.map {
                                             it.value.size
                                         }.sum()
-                                        val totalAmount = selectedTasks.second.map {
+                                        val totalAmount = selectedTasks.tasksByStatus.map {
                                             it.value.size
                                         }.sum()
 
@@ -369,12 +366,12 @@ fun WallboardApp() {
                                             amountSucceeded,
                                             amountFailed,
                                             totalAmount,
-                                            selectedTasks.first.buildCreatedTimestamp,
+                                            selectedTasks.buildCreatedTimestamp,
                                             backgroundLoadingInProgress,
                                         )
 
                                         Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
-                                            Histogram(taskHistory, clickedIndex) {
+                                            Histogram(displayItems[selectedTab]!!, /*taskHistory,*/ clickedIndex) {
                                                 clickPosition = it
                                             }
                                         }

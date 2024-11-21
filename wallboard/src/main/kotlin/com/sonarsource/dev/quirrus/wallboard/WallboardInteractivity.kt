@@ -3,7 +3,6 @@ package com.sonarsource.dev.quirrus.wallboard
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
 import com.sonarsource.dev.quirrus.wallboard.data.DataItemState
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
-import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
@@ -14,6 +13,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.generated.graphql.ID
@@ -23,14 +23,30 @@ import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
-import kotlin.random.Random
 
 internal fun reloadData(
+    repoId: String,
     branches: List<String>,
+    numberOfBuildsToLoad: Int,
     setTabDisplayItems: (String, List<DataItemToDisplay>) -> Unit,
 ) {
+    // 1. load only the build IDs of the last n builds for each branch. This is a relatively fast operation.
+    val lastNBuildsMetadata = branches.associateWith { branch ->
+        runBlocking {
+            println("Getting $numberOfBuildsToLoad builds for branch $branch...")
+            cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.also {
+                println("    ...done.")
+            }
+        }.map {
+            DataItemToDisplay(branch, it.node.id, it.node.buildCreatedTimestamp)
+        }
+    }
+
+    // 2. load the full build data for each build ID. This can take some time for builds with many tasks.
     branches.forEach { branch ->
-        setTabDisplayItems(branch, (1..10).map { index -> DataItemToDisplay(branch, Random.nextLong().toString(), Random.nextLong(), index) })
+        lastNBuildsMetadata[branch]?.let {
+            setTabDisplayItems(branch, it)
+        } ?: setTabDisplayItems(branch, emptyList())
     }
 }
 
@@ -249,16 +265,16 @@ fun authenticate(triggerReload: () -> Unit) {
     }
 }
 
-typealias TaskReruns = List<Task>
+typealias TaskReruns = List<org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task>
 
-class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTimestamp: Long, val index: Int, successorDataItem: DataItemToDisplay? = null) {
+class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTimestamp: Long, successorDataItem: DataItemToDisplay? = null) {
     /*companion object {
         private val nextId = AtomicLong(0)
     }
 
     val id = nextId.getAndIncrement()*/
 
-    var successorDataItem: DataItemToDisplay? = successorDataItem
+    private var successorDataItem: DataItemToDisplay? = successorDataItem
         set(value) {
             if (field != value) {
                 field?.reprocessData(null)
@@ -266,57 +282,53 @@ class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTim
                 field = value
             }
         }
+
+    private var predecessor: DataItemToDisplay? = null
+
     var state: DataItemState = DataItemState.PENDING
     var build: Build? = null
         set(value) {
             field = value
+            reprocessData(predecessor)
             successorDataItem?.reprocessData(this)
         }
 
+    private val rerunsByStatus: MutableMap<Status, MutableList<TaskReruns>> = mutableMapOf()
+    private val metadataByName: MutableMap<String, TaskMetadata> = mutableMapOf()
+
+    val tasksByStatus: Map<Status, List<TaskReruns>>
+        get() = rerunsByStatus
+    val taskMetadata: Map<String, TaskMetadata>
+        get() = metadataByName
+
     private fun reprocessData(reference: DataItemToDisplay?) {
+        predecessor = reference
         val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
             it.name
         }?.mapValues {
-            it.value.sortedBy { run -> run.creationTimestamp } as TaskReruns
+            it.value.sortedByDescending { run -> run.creationTimestamp } as TaskReruns
         } ?: return
 
         if (reference == null) {
-
+            reruns.forEach { (name, reruns) ->
+                val status = Status(StatusCategory.ofCirrusTask(reruns.first()), false)
+                metadataByName[name] = TaskMetadata(status, null)
+                rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
+            }
         } else {
-            build?.tasks.first()
+            reruns.forEach { (name, reruns) ->
+                val referenceMetadata = reference.metadataByName[name]
+                val statusCategory = StatusCategory.ofCirrusTask(reruns.first())
+                val isStatusNew = referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
+                val status = Status(statusCategory, isStatusNew)
 
-            /*return tasks.mapIndexed { i, task ->
-
-
-
-                task.
-
-                var failed = 0
-                var other = 0
-
-                val grouped = taskMap.values.groupBy { task ->
-                    val status = StatusCategory.ofCirrusTask(task.latestRerun)
-
-                    when {
-                        status.isFailingState() -> failed++
-                        else -> other++
-                    }
-
-                    val isNewStatus = filteredHistory.getOrNull(i + 1)?.tasks?.get(task.latestRerun.name)?.latestRerun?.let { lastRun ->
-                        lastRun.status != task.latestRerun.status || StatusCategory.ofCirrusTask(lastRun) != status
-                    } ?: (i < filteredHistory.size - 1)
-
-                    Status(status, isNewStatus)
-                }
-
-                if (failed > maxFailed) maxFailed = failed
-                if (other > maxOther) maxOther = other
-
-                build to grouped
-            }*/
+                val lastDifferentBuild = if (isStatusNew) reference.build?.id else referenceMetadata?.lastBuildWithDifferentStatus
+                metadataByName[name] = TaskMetadata(status, lastDifferentBuild)
+                rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
+            }
         }
         successorDataItem?.reprocessData(this)
     }
 }
 
-data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: ID)
+data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: ID?)

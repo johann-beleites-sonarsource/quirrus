@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.sonarsource.dev.quirrus.wallboard.DataItemToDisplay
+import com.sonarsource.dev.quirrus.wallboard.TaskMetadata
 import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
@@ -41,17 +43,16 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @Composable
 fun TaskList(
-    buildNodeTasks: Pair<Build, Map<Status, List<EnrichedTask>>>,
+    //buildNodeTasks: Pair<Build, Map<Status, List<EnrichedTask>>>,
+    displayItem: DataItemToDisplay,
     verticalScrollState: ScrollState,
     tasksWithDiffs: Map<String, TaskDiffData?>
 ) {
-    val (_, tasks) = buildNodeTasks
-
-    val (completed, failed) = tasks.entries
+    val (completed, failed) = displayItem.tasksByStatus.entries
         .flatMap { (status, tasks) ->
             tasks.map { status to it }
                 .sortedBy { (_, task) ->
-                    task.latestRerun.name
+                    task.first().name
                 }
         }.partition { (status, _) ->
             status.status == StatusCategory.COMPLETED
@@ -62,8 +63,8 @@ fun TaskList(
     Box {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
             //items(failed) { task ->
-            for ((status, enrichedTask) in failed) {
-                enrichedTask.taskReruns.forEachIndexed { index, task ->
+            for ((status, taskReruns) in failed) {
+                taskReruns.forEachIndexed { index, task ->
                     val backgroundColor = if (index == 0) {
                         status.color
                     } else {
@@ -85,7 +86,7 @@ fun TaskList(
                                         color = Color.Black//MaterialTheme.colors.onError
                                     )
 
-                                    SinceText(enrichedTask, Color.Black/*MaterialTheme.colors.onError*/)
+                                    SinceText(displayItem.taskMetadata[task.name]!!, Color.Black/*MaterialTheme.colors.onError*/)
                                 }
                             }
 
@@ -189,7 +190,7 @@ fun TaskList(
             for ((status, task) in completed) {
                 Box(modifier = Modifier.fillMaxWidth().padding(bottom = 1.dp)) {
                     Text(
-                        task.latestRerun.name,
+                        task.first().name,
                         modifier = Modifier
                             .background(color = status.color)
                             .padding(all = 5.dp)
@@ -197,7 +198,7 @@ fun TaskList(
                         color = MaterialTheme.colors.onSecondary
                     )
 
-                    SinceText(task, MaterialTheme.colors.onSecondary)
+                    SinceText(displayItem.taskMetadata[task.first().name]!!, MaterialTheme.colors.onSecondary)
                 }
             }
         }
@@ -209,13 +210,12 @@ fun TaskList(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
-    task.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
+fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
+    taskMetadata.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
         val text = AnnotatedString.Builder().apply {
             pushStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Light, color = color))
-            append("since build ${lastDifferentBuild.id} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
+            append("since build ${lastDifferentBuild} (${dateTimeFormat.format(/*lastDifferentBuild.buildCreatedTimestamp*/0L)})") // FIXME
         }.toAnnotatedString()
 
         ClickableText(
@@ -224,9 +224,9 @@ fun BoxScope.SinceText(task: EnrichedTask, color: Color) {
                 .align(Alignment.CenterEnd)
                 .pointerHoverIcon(PointerIcon.Hand),
         ) {
-            lastDifferentBuild.tasks.firstOrNull { it.name == task.taskReruns.first().name }?.let { task ->
+            /*lastDifferentBuild.tasks.firstOrNull { it.name == task.taskReruns.first().name }?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
-            }
+            }*/ // FIXME
         }
     }
 }

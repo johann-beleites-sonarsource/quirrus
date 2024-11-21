@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import com.sonarsource.dev.quirrus.wallboard.DataItemToDisplay
 import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
 import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
@@ -41,7 +42,8 @@ val timeOnly = SimpleDateFormat("HH:mm")
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun Histogram(
-    taskHistoryWithBuildNode: List<Pair<Build, Map<Status, List<EnrichedTask>>>>,
+    displayItems: List<DataItemToDisplay>,
+    //taskHistoryWithBuildNode: List<Pair<Build, Map<Status, List<EnrichedTask>>>>,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {
@@ -70,20 +72,21 @@ fun Histogram(
             maxX = size.width
             val maxY = size.height - 20f
 
-            val filteredTaskHistoryWithBuildNode = taskHistoryWithBuildNode.map { (buildNode, categorizedTasks) ->
+            // TODO: filter out successful tasks
+            /*val filteredTaskHistoryWithBuildNode = taskHistoryWithBuildNode.map { (buildNode, categorizedTasks) ->
                 buildNode to categorizedTasks.filter { (status, _) ->
                     status.new || status.status != StatusCategory.COMPLETED
                 }
-            }
+            }*/
 
-            val maxFailed = filteredTaskHistoryWithBuildNode.maxOf { (buildNode, tasks) ->
-                tasks.filter { (status, _) ->
+            val maxFailed = /*filteredTaskHistoryWithBuildNode*/displayItems.maxOf { displayItem ->
+                displayItem.tasksByStatus.filter { (status, _) ->
                     status.status.isFailingState()
                 }.values.sumOf { it.size }
             }
 
-            val maxNotFailed = filteredTaskHistoryWithBuildNode.maxOf { (buildNode, tasks) ->
-                tasks.filter { (status, _) ->
+            val maxNotFailed = /*filteredTaskHistoryWithBuildNode*/displayItems.maxOf { displayItem ->
+                displayItem.tasksByStatus.filter { (status, _) ->
                     !status.status.isFailingState() && !(status.status == StatusCategory.COMPLETED && !status.new)
                 }.values.sumOf { it.size }
             }
@@ -93,7 +96,8 @@ fun Histogram(
             val stepHeight = (maxY) / total.toFloat()
             val zeroYOffset = stepHeight * maxFailed.toFloat() + 5f
 
-            slotPerBar = maxX / filteredTaskHistoryWithBuildNode.size.toFloat()
+            //slotPerBar = maxX / filteredTaskHistoryWithBuildNode.size.toFloat()
+            slotPerBar = maxX / displayItems.size.toFloat()
             val barWidth = slotPerBar - (2 * barPadding)
 
             drawRect(
@@ -121,8 +125,8 @@ fun Histogram(
             var left = maxX - barWidth - barPadding
             var i = 0
 
-            filteredTaskHistoryWithBuildNode.forEachIndexed { i, (buildNode, categorizedTasks) ->
-                categorizedTasks.map { (status, tasks) ->
+            /*filteredTaskHistoryWithBuildNode*/displayItems.forEachIndexed { i, displayItem ->
+                displayItem.tasksByStatus.map { (status, tasks) ->
                     status to tasks.count()
                 }.partition { (status, _) ->
                     status.status.isFailingState()
@@ -153,7 +157,7 @@ fun Histogram(
                         top + height
                     }
 
-                    val creationDate = Date(buildNode.buildCreatedTimestamp)
+                    val creationDate = Date(displayItem.build?.buildCreatedTimestamp ?: 0)
                     drawText(dateOnly.format(creationDate), left, maxY + 2f)
                     drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
