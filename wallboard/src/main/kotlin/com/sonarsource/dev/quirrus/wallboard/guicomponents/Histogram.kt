@@ -39,7 +39,6 @@ val barPadding = 5f
 val dateOnly = SimpleDateFormat("dd.MM.yyyy")
 val timeOnly = SimpleDateFormat("HH:mm")
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun Histogram(
     displayItems: List<DataItemToDisplay>,

@@ -215,7 +215,7 @@ fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
     taskMetadata.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
         val text = AnnotatedString.Builder().apply {
             pushStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Light, color = color))
-            append("since build ${lastDifferentBuild} (${dateTimeFormat.format(/*lastDifferentBuild.buildCreatedTimestamp*/0L)})") // FIXME
+            append("since build ${lastDifferentBuild.buildId} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
         }.toAnnotatedString()
 
         ClickableText(
@@ -224,9 +224,10 @@ fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
                 .align(Alignment.CenterEnd)
                 .pointerHoverIcon(PointerIcon.Hand),
         ) {
-            /*lastDifferentBuild.tasks.firstOrNull { it.name == task.taskReruns.first().name }?.let { task ->
+            val taskName = taskMetadata.reruns.first().name
+            lastDifferentBuild.taskMetadata[taskName]?.reruns?.firstOrNull()?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
-            }*/ // FIXME
+            }
         }
     }
 }

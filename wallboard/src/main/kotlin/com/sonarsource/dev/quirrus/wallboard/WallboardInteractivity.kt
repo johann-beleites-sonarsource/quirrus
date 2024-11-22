@@ -339,6 +339,9 @@ class DataItemToDisplay(
         get() = metadataByName
 
     private fun reprocessData(reference: DataItemToDisplay?) {
+        rerunsByStatus.clear()
+        metadataByName.clear()
+
         val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
             it.name
         }?.mapValues {
@@ -348,7 +351,7 @@ class DataItemToDisplay(
         if (reference == null) {
             reruns.forEach { (name, reruns) ->
                 val status = Status(StatusCategory.ofCirrusTask(reruns.first()), false)
-                metadataByName[name] = TaskMetadata(status, null)
+                metadataByName[name] = TaskMetadata(status, null, reruns)
                 rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
             }
         } else {
@@ -358,8 +361,8 @@ class DataItemToDisplay(
                 val isStatusNew = referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
                 val status = Status(statusCategory, isStatusNew)
 
-                val lastDifferentBuild = if (isStatusNew) reference.build?.id else referenceMetadata?.lastBuildWithDifferentStatus
-                metadataByName[name] = TaskMetadata(status, lastDifferentBuild)
+                val lastDifferentBuild = if (isStatusNew) reference else referenceMetadata?.lastBuildWithDifferentStatus
+                metadataByName[name] = TaskMetadata(status, lastDifferentBuild, reruns)
                 rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
             }
         }
@@ -367,4 +370,4 @@ class DataItemToDisplay(
     }
 }
 
-data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: ID?)
+data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: DataItemToDisplay?, var reruns: TaskReruns)
