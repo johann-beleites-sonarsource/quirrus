@@ -42,7 +42,6 @@ val timeOnly = SimpleDateFormat("HH:mm")
 @Composable
 fun Histogram(
     displayItems: List<DataItemToDisplay>,
-    //taskHistoryWithBuildNode: List<Pair<Build, Map<Status, List<EnrichedTask>>>>,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {
@@ -78,13 +77,13 @@ fun Histogram(
                 }
             }*/
 
-            val maxFailed = /*filteredTaskHistoryWithBuildNode*/displayItems.maxOf { displayItem ->
+            val maxFailed = displayItems.maxOf { displayItem ->
                 displayItem.tasksByStatus.filter { (status, _) ->
                     status.status.isFailingState()
                 }.values.sumOf { it.size }
             }
 
-            val maxNotFailed = /*filteredTaskHistoryWithBuildNode*/displayItems.maxOf { displayItem ->
+            val maxNotFailed = displayItems.maxOf { displayItem ->
                 displayItem.tasksByStatus.filter { (status, _) ->
                     !status.status.isFailingState() && !(status.status == StatusCategory.COMPLETED && !status.new)
                 }.values.sumOf { it.size }
@@ -95,7 +94,6 @@ fun Histogram(
             val stepHeight = (maxY) / total.toFloat()
             val zeroYOffset = stepHeight * maxFailed.toFloat() + 5f
 
-            //slotPerBar = maxX / filteredTaskHistoryWithBuildNode.size.toFloat()
             slotPerBar = maxX / displayItems.size.toFloat()
             val barWidth = slotPerBar - (2 * barPadding)
 
@@ -111,20 +109,7 @@ fun Histogram(
                 end = Offset(x = maxX, y = zeroYOffset),
             )
 
-            /*generateSequence(stepHeight) { it + stepHeight }.takeWhile { it <= maxY }.forEach {
-                drawLine(
-                    color = Color.Black,
-                    start = Offset(x = 0f, y = it),
-                    end = Offset(x = maxX, y = it),
-                    strokeWidth = .1f,
-                )
-            }*/
-
-
-            var left = maxX - barWidth - barPadding
-            var i = 0
-
-            /*filteredTaskHistoryWithBuildNode*/displayItems.forEachIndexed { i, displayItem ->
+            displayItems.forEachIndexed { i, displayItem ->
                 displayItem.tasksByStatus.map { (status, tasks) ->
                     status to tasks.count()
                 }.partition { (status, _) ->
@@ -161,17 +146,6 @@ fun Histogram(
                     drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
             }
-
-            /*while (left > 0) {
-                val randomAmount = randomVals[i]
-                drawRect(
-                    color = if (clickPosition > left && clickPosition < left + barWidth) Color.Black else Color.Red,
-                    topLeft = Offset(x = left, maxY - (stepHeight * randomAmount)),
-                    size = Size(width = barWidth, height = stepHeight * randomAmount),
-                )
-                left = left - barWidth - (2 * barPadding)
-                i++
-            }*/
         }
     }
 }

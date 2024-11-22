@@ -43,7 +43,6 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @Composable
 fun TaskList(
-    //buildNodeTasks: Pair<Build, Map<Status, List<EnrichedTask>>>,
     displayItem: DataItemToDisplay,
     verticalScrollState: ScrollState,
     tasksWithDiffs: Map<String, TaskDiffData?>
