@@ -45,10 +45,9 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.sonarsource.dev.quirrus.generated.graphql.enums.TaskStatus
-import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
-import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
+import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
 var cirrusData = CirrusData(API_CONF)
@@ -57,7 +56,9 @@ internal enum class AppState {
     LOADING, ERROR, NONE, INIT
 }
 
-const val numberOfBuildsToLoad = 10
+private const val numberOfBuildsToLoad = 10
+private var refreshJob: Job? = null
+private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
 
 @Composable
 @Preview
@@ -95,7 +96,20 @@ fun WallboardApp() {
         if (state == AppState.LOADING) {
             // Cancel
             loadingCancelled = true
+            refreshJob?.cancel()
+            runBlocking {
+                refreshJob?.join()
+            }
+            backgroundFetchingAssistant?.cancel()
+            state = AppState.NONE
+            loadingCancelled = false
         } else {
+            val fetchingAssistant = BackgroundFetchingAssistant {
+                state = AppState.NONE
+            }
+
+            backgroundFetchingAssistant = fetchingAssistant
+
             displayItems.clear()
             displayItems.putAll(branches.map { branch ->
                 branch to mutableStateListOf()
@@ -123,12 +137,28 @@ fun WallboardApp() {
                 { branch, error -> errors[branch] = error },
                 { loadingCancelled },
             )*/
-            reloadData(
-                repoTextFieldVal,
-                branches,
-                numberOfBuildsToLoad,
-                { branch, builds -> displayItems[branch] = mutableStateListOf(*builds.toTypedArray()) },
-            )
+
+            runCatching {
+                reloadData(
+                    repoTextFieldVal,
+                    branches,
+                    numberOfBuildsToLoad,
+                    state,
+                    fetchingAssistant,
+                    { state = it; loadingCancelled = false },
+                    { branch, builds ->
+                        displayItems[branch] = mutableStateListOf(*builds.toTypedArray())
+                        branchState[branch] = AppState.NONE
+                    },
+                )?.let {
+                    refreshJob = it
+                }
+            }.onFailure {
+                state = AppState.ERROR
+                System.err.println("Error: ${it.message}")
+                it.printStackTrace()
+                errors[selectedTab ?: ""] = it.message ?: "Unknown error"
+            }
         }
     }
 

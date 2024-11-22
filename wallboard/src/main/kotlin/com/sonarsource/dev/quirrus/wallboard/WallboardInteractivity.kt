@@ -7,6 +7,7 @@ import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -28,27 +29,55 @@ internal fun reloadData(
     repoId: String,
     branches: List<String>,
     numberOfBuildsToLoad: Int,
+    appState: AppState,
+    backgroundFetchingAssistant: BackgroundFetchingAssistant,
+    setAppState: (AppState) -> Unit,
     setTabDisplayItems: (String, List<DataItemToDisplay>) -> Unit,
-) {
-    // 1. load only the build IDs of the last n builds for each branch. This is a relatively fast operation.
-    val lastNBuildsMetadata = branches.associateWith { branch ->
-        runBlocking {
-            println("Getting $numberOfBuildsToLoad builds for branch $branch...")
-            cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.also {
-                println("    ...done.")
-            }
-        }.map {
-            DataItemToDisplay(branch, it.node.id, it.node.buildCreatedTimestamp)
+): Job? {
+    if (appState == AppState.LOADING) return null
+    setAppState(AppState.LOADING)
+
+
+    return GlobalScope.launch {
+        // 1. load only the build IDs of the last n builds for each branch. This is a relatively fast operation.
+        val lastNBuildsMetadata = getMetadataOnLastNBuilds(repoId, branches, numberOfBuildsToLoad)
+
+        // 2. Display the data
+        branches.forEach { branch ->
+            lastNBuildsMetadata[branch]?.let {
+                setTabDisplayItems(branch, it)
+            } ?: setTabDisplayItems(branch, emptyList())
+        }
+
+        // 3. launch the loading of the full build data for each build ID. Loading the data can take some time for builds with many tasks.
+        lastNBuildsMetadata.values.flatten().sortedByDescending { it.buildCreatedTimestamp }.let {
+            backgroundFetchingAssistant.start(it)
         }
     }
-
-    // 2. load the full build data for each build ID. This can take some time for builds with many tasks.
-    branches.forEach { branch ->
-        lastNBuildsMetadata[branch]?.let {
-            setTabDisplayItems(branch, it)
-        } ?: setTabDisplayItems(branch, emptyList())
-    }
 }
+
+suspend fun getMetadataOnLastNBuilds(repoId: String, branches: List<String>, numberOfBuildsToLoad: Int) =
+    coroutineScope {
+        branches.associateWith { branch ->
+            async {
+                //log.debug("Loading metadata for branch $branch")
+                cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.map {
+                    DataItemToDisplay(branch, it.node.id, it.node.buildCreatedTimestamp)
+                }.sortedByDescending {
+                    it.buildCreatedTimestamp
+                }.also { items ->
+                    items.fold(null) { successor: DataItemToDisplay?, item ->
+                        item.successorDataItem = successor
+                        item
+                    }
+                }
+            }
+        }.mapValues { (_, deferred) ->
+            deferred.await()/*.also {
+                log.debug("Finished loading metadata for branch ${it.first().branch}")
+            }*/
+        }
+    }
 
 internal fun reloadData(
     currentState: AppState,
@@ -267,19 +296,27 @@ fun authenticate(triggerReload: () -> Unit) {
 
 typealias TaskReruns = List<org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task>
 
-class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTimestamp: Long, successorDataItem: DataItemToDisplay? = null) {
+class DataItemToDisplay(
+    val branch: String,
+    val buildId: ID,
+    val buildCreatedTimestamp: Long,
+    successorDataItem: DataItemToDisplay? = null
+) {
     /*companion object {
         private val nextId = AtomicLong(0)
     }
 
     val id = nextId.getAndIncrement()*/
 
-    private var successorDataItem: DataItemToDisplay? = successorDataItem
+    internal var successorDataItem: DataItemToDisplay? = successorDataItem
         set(value) {
             if (field != value) {
+                field?.predecessor = null
                 field?.reprocessData(null)
-                value?.reprocessData(this)
+
                 field = value
+                value?.predecessor = this
+                value?.reprocessData(this)
             }
         }
 
@@ -302,7 +339,6 @@ class DataItemToDisplay(val branch: String, val buildId: ID, val buildCreatedTim
         get() = metadataByName
 
     private fun reprocessData(reference: DataItemToDisplay?) {
-        predecessor = reference
         val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
             it.name
         }?.mapValues {

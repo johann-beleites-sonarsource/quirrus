@@ -157,7 +157,7 @@ fun Histogram(
                         top + height
                     }
 
-                    val creationDate = Date(displayItem.build?.buildCreatedTimestamp ?: 0)
+                    val creationDate = Date(displayItem.buildCreatedTimestamp)
                     drawText(dateOnly.format(creationDate), left, maxY + 2f)
                     drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
