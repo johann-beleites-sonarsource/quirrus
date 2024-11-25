@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.generated.graphql.ID
+import org.sonarsource.dev.quirrus.generated.graphql.enums.TaskStatus
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
 import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
@@ -315,8 +316,7 @@ class DataItemToDisplay(
                 field?.reprocessData(null)
 
                 field = value
-                value?.predecessor = this
-                value?.reprocessData(this)
+                updateSuccessor()
             }
         }
 
@@ -327,7 +327,6 @@ class DataItemToDisplay(
         set(value) {
             field = value
             reprocessData(predecessor)
-            successorDataItem?.reprocessData(this)
         }
 
     private val rerunsByStatus: MutableMap<Status, MutableList<TaskReruns>> = mutableMapOf()
@@ -345,7 +344,7 @@ class DataItemToDisplay(
         val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
             it.name
         }?.mapValues {
-            it.value.sortedByDescending { run -> run.creationTimestamp } as TaskReruns
+            it.value.sortedByDescending { run -> run.creationTimestamp }
         } ?: return
 
         if (reference == null) {
@@ -355,10 +354,11 @@ class DataItemToDisplay(
                 rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
             }
         } else {
+            val shouldBeUsedAsReference = shouldBeUsedAsReference()
             reruns.forEach { (name, reruns) ->
                 val referenceMetadata = reference.metadataByName[name]
                 val statusCategory = StatusCategory.ofCirrusTask(reruns.first())
-                val isStatusNew = referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
+                val isStatusNew = shouldBeUsedAsReference && referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
                 val status = Status(statusCategory, isStatusNew)
 
                 val lastDifferentBuild = if (isStatusNew) reference else referenceMetadata?.lastBuildWithDifferentStatus
@@ -366,8 +366,21 @@ class DataItemToDisplay(
                 rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
             }
         }
-        successorDataItem?.reprocessData(this)
+        updateSuccessor()
     }
+
+    private fun updateSuccessor() {
+        if (shouldBeUsedAsReference()) {
+            successorDataItem?.predecessor = this
+            successorDataItem?.reprocessData(this)
+        } else {
+            successorDataItem?.predecessor = predecessor
+            successorDataItem?.reprocessData(predecessor)
+        }
+    }
+
+    private fun shouldBeUsedAsReference() =
+        build?.tasks?.any { it.status !in listOf(TaskStatus.SKIPPED, TaskStatus.ABORTED) } ?: true
 }
 
 data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: DataItemToDisplay?, var reruns: TaskReruns)
