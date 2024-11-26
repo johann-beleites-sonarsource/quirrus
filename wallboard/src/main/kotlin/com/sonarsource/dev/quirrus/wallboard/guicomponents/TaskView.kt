@@ -16,7 +16,6 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -26,13 +25,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.sonarsource.dev.quirrus.wallboard.DataItemToDisplay
+import com.sonarsource.dev.quirrus.wallboard.BuildDataItem
 import com.sonarsource.dev.quirrus.wallboard.TaskMetadata
-import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
-import com.sonarsource.dev.quirrus.wallboard.data.Status
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
-import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -43,7 +39,7 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @Composable
 fun TaskList(
-    displayItem: DataItemToDisplay,
+    displayItem: BuildDataItem,
     verticalScrollState: ScrollState,
     tasksWithDiffs: Map<String, TaskDiffData?>
 ) {
@@ -214,7 +210,7 @@ fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
     taskMetadata.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
         val text = AnnotatedString.Builder().apply {
             pushStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Light, color = color))
-            append("since build ${lastDifferentBuild.buildId} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
+            append("since build ${lastDifferentBuild.id} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
         }.toAnnotatedString()
 
         ClickableText(

@@ -1,10 +1,7 @@
 package com.sonarsource.dev.quirrus.wallboard
 
 import com.sonarsource.dev.quirrus.wallboard.data.BuildWithTasks
-import com.sonarsource.dev.quirrus.wallboard.data.DataItemState
 import com.sonarsource.dev.quirrus.wallboard.data.DataProcessing
-import com.sonarsource.dev.quirrus.wallboard.data.Status
-import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
@@ -14,14 +11,10 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.api.Common
 import org.sonarsource.dev.quirrus.api.LogDownloader
-import org.sonarsource.dev.quirrus.generated.graphql.ID
-import org.sonarsource.dev.quirrus.generated.graphql.enums.TaskStatus
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Task
-import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import org.sonarsource.dev.quirrus.gui.GuiAuthenticationHelper
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLHandshakeException
@@ -31,9 +24,9 @@ internal fun reloadData(
     branches: List<String>,
     numberOfBuildsToLoad: Int,
     appState: AppState,
-    backgroundFetchingAssistant: BackgroundFetchingAssistant,
+    buildDataManager: BuildDataManager,
     setAppState: (AppState) -> Unit,
-    setTabDisplayItems: (String, List<DataItemToDisplay>) -> Unit,
+    setTabDisplayItems: (String, List<String>) -> Unit,
 ): Job? {
     if (appState == AppState.LOADING) return null
     setAppState(AppState.LOADING)
@@ -45,14 +38,14 @@ internal fun reloadData(
 
         // 2. Display the data
         branches.forEach { branch ->
-            lastNBuildsMetadata[branch]?.let {
+            lastNBuildsMetadata[branch]?.map { it.id }?.let {
                 setTabDisplayItems(branch, it)
             } ?: setTabDisplayItems(branch, emptyList())
         }
 
         // 3. launch the loading of the full build data for each build ID. Loading the data can take some time for builds with many tasks.
         lastNBuildsMetadata.values.flatten().sortedByDescending { it.buildCreatedTimestamp }.let {
-            backgroundFetchingAssistant.start(it)
+            buildDataManager.load(it)
         }
     }
 }
@@ -63,14 +56,9 @@ suspend fun getMetadataOnLastNBuilds(repoId: String, branches: List<String>, num
             async {
                 //log.debug("Loading metadata for branch $branch")
                 cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.map {
-                    DataItemToDisplay(branch, it.node.id, it.node.buildCreatedTimestamp)
+                    PendingBuildData(id = it.node.id, buildCreatedTimestamp = it.node.buildCreatedTimestamp)
                 }.sortedByDescending {
                     it.buildCreatedTimestamp
-                }.also { items ->
-                    items.fold(null) { successor: DataItemToDisplay?, item ->
-                        item.successorDataItem = successor
-                        item
-                    }
                 }
             }
         }.mapValues { (_, deferred) ->
@@ -295,92 +283,3 @@ fun authenticate(triggerReload: () -> Unit) {
     }
 }
 
-typealias TaskReruns = List<org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task>
-
-class DataItemToDisplay(
-    val branch: String,
-    val buildId: ID,
-    val buildCreatedTimestamp: Long,
-    successorDataItem: DataItemToDisplay? = null
-) {
-    /*companion object {
-        private val nextId = AtomicLong(0)
-    }
-
-    val id = nextId.getAndIncrement()*/
-
-    internal var successorDataItem: DataItemToDisplay? = successorDataItem
-        set(value) {
-            if (field != value) {
-                field?.predecessor = null
-                field?.reprocessData(null)
-
-                field = value
-                updateSuccessor()
-            }
-        }
-
-    private var predecessor: DataItemToDisplay? = null
-
-    var state: DataItemState = DataItemState.PENDING
-    var build: Build? = null
-        set(value) {
-            field = value
-            reprocessData(predecessor)
-        }
-
-    private val rerunsByStatus: MutableMap<Status, MutableList<TaskReruns>> = mutableMapOf()
-    private val metadataByName: MutableMap<String, TaskMetadata> = mutableMapOf()
-
-    val tasksByStatus: Map<Status, List<TaskReruns>>
-        get() = rerunsByStatus
-    val taskMetadata: Map<String, TaskMetadata>
-        get() = metadataByName
-
-    private fun reprocessData(reference: DataItemToDisplay?) {
-        rerunsByStatus.clear()
-        metadataByName.clear()
-
-        val reruns: Map<String, TaskReruns> = build?.tasks?.groupBy {
-            it.name
-        }?.mapValues {
-            it.value.sortedByDescending { run -> run.creationTimestamp }
-        } ?: return
-
-        if (reference == null) {
-            reruns.forEach { (name, reruns) ->
-                val status = Status(StatusCategory.ofCirrusTask(reruns.first()), false)
-                metadataByName[name] = TaskMetadata(status, null, reruns)
-                rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
-            }
-        } else {
-            val shouldBeUsedAsReference = shouldBeUsedAsReference()
-            reruns.forEach { (name, reruns) ->
-                val referenceMetadata = reference.metadataByName[name]
-                val statusCategory = StatusCategory.ofCirrusTask(reruns.first())
-                val isStatusNew = shouldBeUsedAsReference && referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
-                val status = Status(statusCategory, isStatusNew)
-
-                val lastDifferentBuild = if (isStatusNew) reference else referenceMetadata?.lastBuildWithDifferentStatus
-                metadataByName[name] = TaskMetadata(status, lastDifferentBuild, reruns)
-                rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
-            }
-        }
-        updateSuccessor()
-    }
-
-    private fun updateSuccessor() {
-        if (shouldBeUsedAsReference()) {
-            successorDataItem?.predecessor = this
-            successorDataItem?.reprocessData(this)
-        } else {
-            successorDataItem?.predecessor = predecessor
-            successorDataItem?.reprocessData(predecessor)
-        }
-    }
-
-    private fun shouldBeUsedAsReference() =
-        build?.tasks?.any { it.status !in listOf(TaskStatus.SKIPPED, TaskStatus.ABORTED) } ?: true
-}
-
-data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: DataItemToDisplay?, var reruns: TaskReruns)

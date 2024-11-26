@@ -13,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -23,14 +22,11 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
-import com.sonarsource.dev.quirrus.wallboard.DataItemToDisplay
-import com.sonarsource.dev.quirrus.wallboard.data.EnrichedTask
-import com.sonarsource.dev.quirrus.wallboard.data.Status
+import com.sonarsource.dev.quirrus.wallboard.BuildDataItem
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.jetbrains.skia.Font
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.TextLine
-import org.sonarsource.dev.quirrus.generated.graphql.gettasks.Build
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -41,7 +37,7 @@ val timeOnly = SimpleDateFormat("HH:mm")
 
 @Composable
 fun Histogram(
-    displayItems: List<DataItemToDisplay>,
+    displayItems: List<BuildDataItem>,
     selectItem: Int,
     updateClickIndexFraction: (Float) -> Unit
 ) {

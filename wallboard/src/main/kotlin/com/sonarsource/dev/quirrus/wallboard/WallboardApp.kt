@@ -59,6 +59,7 @@ internal enum class AppState {
 private const val numberOfBuildsToLoad = 10
 private var refreshJob: Job? = null
 private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
+lateinit var buildDataManager: BuildDataManager
 
 @Composable
 @Preview
@@ -66,7 +67,12 @@ fun WallboardApp() {
     var state by remember { mutableStateOf(AppState.INIT) }
 
     val displayItems by remember {
-        mutableStateOf(mutableStateMapOf<String, SnapshotStateList<DataItemToDisplay>>())
+        mutableStateOf(mutableStateMapOf<String, SnapshotStateList<String>>())
+    }
+
+    // Mapping of build ID -> data item. Used to store all data.
+    val displayItemDirectory by remember {
+        mutableStateOf(mutableStateMapOf<String, BuildDataItem>())
     }
 
     var selectedTab: String? by remember { mutableStateOf(null) }
@@ -83,6 +89,14 @@ fun WallboardApp() {
     val errors by remember { mutableStateOf(mutableStateMapOf<String, String>()) }
     var loadingCancelled by remember { mutableStateOf(false) }
 
+    if (!::buildDataManager.isInitialized) {
+        buildDataManager = BuildDataManager(
+            { state = it }
+        ) {
+            displayItemDirectory[it.id] = it
+        }
+    }
+
     fun saveConfig() {
         with(WallboardConfig) {
             WallboardConfig.branches = branches
@@ -92,6 +106,8 @@ fun WallboardApp() {
         }
     }
 
+    fun buildsByBranch(branch: String) = displayItems[branch]?.map { displayItemDirectory[it]!! }
+
     fun triggerReload() {
         if (state == AppState.LOADING) {
             // Cancel
@@ -100,16 +116,10 @@ fun WallboardApp() {
             runBlocking {
                 refreshJob?.join()
             }
-            backgroundFetchingAssistant?.cancel()
+            buildDataManager?.cancel()
             state = AppState.NONE
             loadingCancelled = false
         } else {
-            val fetchingAssistant = BackgroundFetchingAssistant {
-                state = AppState.NONE
-            }
-
-            backgroundFetchingAssistant = fetchingAssistant
-
             displayItems.clear()
             displayItems.putAll(branches.map { branch ->
                 branch to mutableStateListOf()
@@ -144,7 +154,7 @@ fun WallboardApp() {
                     branches,
                     numberOfBuildsToLoad,
                     state,
-                    fetchingAssistant,
+                    buildDataManager,
                     { state = it; loadingCancelled = false },
                     { branch, builds ->
                         displayItems[branch] = mutableStateListOf(*builds.toTypedArray())
@@ -265,7 +275,7 @@ fun WallboardApp() {
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
                             text = branch,
                             //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
-                            bgColor = (displayItems[branch]?.firstOrNull()?.tasksByStatus?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
+                            bgColor = ((buildsByBranch(branch)?.firstOrNull() as? LoadedBuildData)?.rerunsByStatus?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
                             selected = branch == selectedTab
                         )
                     }
@@ -419,6 +429,7 @@ fun WallboardApp() {
         }
     }
 }
+
 
 
 

@@ -8,28 +8,37 @@ import kotlinx.coroutines.launch
 import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import java.util.concurrent.atomic.AtomicInteger
 
-class BackgroundFetchingAssistant(val doneHandler: () -> Unit) {
+class BackgroundFetchingAssistant(
+    private val updateBuildData: (BuildDataItem) -> Unit,
+    private val doneHandler: () -> Unit
+) {
 
     private lateinit var worker: Worker
     private val toProcess = AtomicInteger(0)
 
-    private class Worker(doneHandler: () -> Unit) {
-        val buildsToFetch = Channel<DataItemToDisplay>()
-        private val dataToDisplay = Channel<Pair<DataItemToDisplay, Build>>()
+    private class Worker(updateBuildData: (BuildDataItem) -> Unit, doneHandler: () -> Unit) {
+        val buildsToFetch = Channel<PendingBuildData>()
+        private val dataToDisplay = Channel<Pair<LoadingBuildData, Build>>()
 
         private val buildFetcherBackgroundJob = GlobalScope.launch {
             buildsToFetch.consumeEach { displayItem ->
                 launch {
-                    displayItem.state = DataItemState.LOADING
-                    dataToDisplay.send(displayItem to cirrusData.getTasksOfSingleBuild(displayItem.buildId))
+                    LoadingBuildData.from(displayItem).let {
+                        updateBuildData(it)
+                        dataToDisplay.send(it to cirrusData.getTasksOfSingleBuild(it.id))
+                    }
                 }
             }
         }
 
         private val dataDisplayJob = GlobalScope.launch {
             dataToDisplay.consumeEach { (displayItem, build) ->
-                displayItem.build = build
-                displayItem.state = DataItemState.DONE
+                LoadedBuildData(
+                    id = displayItem.id,
+                    buildCreatedTimestamp = displayItem.buildCreatedTimestamp,
+                    build = build,
+                ).let(updateBuildData)
+
                 doneHandler()
             }
         }
@@ -42,10 +51,12 @@ class BackgroundFetchingAssistant(val doneHandler: () -> Unit) {
         }
     }
 
-    suspend fun start(dataItems: List<DataItemToDisplay>) {
+    suspend fun start(dataItems: List<PendingBuildData>) {
+        check (toProcess.get() <= 0) { "Already processing" }
+
         toProcess.set(dataItems.size)
-        worker = Worker {
-            if(toProcess.decrementAndGet() <= 0) {
+        worker = Worker(updateBuildData) {
+            if (toProcess.decrementAndGet() <= 0) {
                 doneHandler()
             }
         }
