@@ -59,7 +59,7 @@ internal enum class AppState {
 private const val numberOfBuildsToLoad = 10
 private var refreshJob: Job? = null
 private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
-lateinit var buildDataManager: BuildDataManager
+private lateinit var buildDataManager: BuildDataManager
 
 @Composable
 @Preview
@@ -91,7 +91,8 @@ fun WallboardApp() {
 
     if (!::buildDataManager.isInitialized) {
         buildDataManager = BuildDataManager(
-            { state = it }
+            { id -> displayItemDirectory[id] },
+            { state = it },
         ) {
             displayItemDirectory[it.id] = it
         }
@@ -106,7 +107,9 @@ fun WallboardApp() {
         }
     }
 
-    fun buildsByBranch(branch: String) = displayItems[branch]?.map { displayItemDirectory[it]!! }
+    fun buildsByBranch(branch: String) = displayItems[branch]?.map {
+        displayItemDirectory[it]!!
+    }
 
     fun triggerReload() {
         if (state == AppState.LOADING) {
@@ -157,7 +160,8 @@ fun WallboardApp() {
                     buildDataManager,
                     { state = it; loadingCancelled = false },
                     { branch, builds ->
-                        displayItems[branch] = mutableStateListOf(*builds.toTypedArray())
+                        displayItems[branch] = mutableStateListOf(*builds.map { it.id }.toTypedArray())
+                        displayItemDirectory.putAll(builds.associateBy { it.id })
                         branchState[branch] = AppState.NONE
                     },
                 )?.let {
@@ -275,7 +279,8 @@ fun WallboardApp() {
                             //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
                             text = branch,
                             //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
-                            bgColor = ((buildsByBranch(branch)?.firstOrNull() as? LoadedBuildData)?.rerunsByStatus?.keys?.maxByOrNull { it }?.color ?: Color.Gray),
+                            bgColor = ((buildsByBranch(branch)?.firstOrNull() as? LoadedBuildData)?.rerunsByStatus?.keys?.maxByOrNull { it }?.color
+                                ?: Color.Gray),
                             selected = branch == selectedTab
                         )
                     }
@@ -385,39 +390,58 @@ fun WallboardApp() {
                                         // return@let -- this creates a compilation runtime error. so instead we have an else clause
                                     } else {
 
-                                        val selectedTasks = displayItems[selectedTab]!![clickedIndex]//taskHistory[clickedIndex]
-                                        val amountFailed = selectedTasks.tasksByStatus.filter {
-                                            it.key.status.isFailingState()
-                                        }.map {
-                                            it.value.size
-                                        }.sum()
-                                        val amountSucceeded = selectedTasks.tasksByStatus.filter {
-                                            it.key.status == StatusCategory.COMPLETED
-                                        }.map {
-                                            it.value.size
-                                        }.sum()
-                                        val totalAmount = selectedTasks.tasksByStatus.map {
-                                            it.value.size
-                                        }.sum()
+                                        val selectedTasks = displayItems[selectedTab]!![clickedIndex].let { buildId ->
+                                            displayItemDirectory[buildId] ?: throw IllegalStateException("Build $buildId data not found")
+                                        }
 
+                                        if (selectedTasks is LoadedBuildData) {
+                                            val amountFailed = selectedTasks.rerunsByStatus.filter {
+                                                it.key.status.isFailingState()
+                                            }.map {
+                                                it.value.size
+                                            }.sum()
+                                            val amountSucceeded = selectedTasks.rerunsByStatus.filter {
+                                                it.key.status == StatusCategory.COMPLETED
+                                            }.map {
+                                                it.value.size
+                                            }.sum()
+                                            val totalAmount = selectedTasks.rerunsByStatus.map {
+                                                it.value.size
+                                            }.sum()
 
-                                        ListTitle(
-                                            "$selectedTab Peach Jobs",
-                                            amountSucceeded,
-                                            amountFailed,
-                                            totalAmount,
-                                            selectedTasks.buildCreatedTimestamp,
-                                            backgroundLoadingInProgress,
-                                        )
+                                            ListTitle(
+                                                "$selectedTab Peach Jobs",
+                                                amountSucceeded,
+                                                amountFailed,
+                                                totalAmount,
+                                                selectedTasks.buildCreatedTimestamp,
+                                                backgroundLoadingInProgress,
+                                            )
+                                        }
 
                                         Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
-                                            Histogram(displayItems[selectedTab]!!, /*taskHistory,*/ clickedIndex) {
+                                            Histogram(
+                                                displayItems[selectedTab]!!.map { displayItemDirectory[it]!! }, /*taskHistory,*/
+                                                clickedIndex
+                                            ) {
                                                 clickPosition = it
                                             }
                                         }
 
                                         Row(modifier = Modifier.weight(0.6f)) {
-                                            TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                            if (selectedTasks is LoadedBuildData) {
+                                                TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                            } else if (state != AppState.LOADING) {
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        "No data available",
+                                                        color = MaterialTheme.colors.error,
+                                                        fontWeight = FontWeight.Bold,
+                                                    )
+                                                }
+                                            } else {
+                                                LoadingScreen()
+                                            }
                                         }
                                     }
                                 }

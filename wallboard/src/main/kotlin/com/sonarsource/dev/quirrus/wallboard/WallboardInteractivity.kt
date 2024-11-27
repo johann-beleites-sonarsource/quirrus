@@ -26,7 +26,7 @@ internal fun reloadData(
     appState: AppState,
     buildDataManager: BuildDataManager,
     setAppState: (AppState) -> Unit,
-    setTabDisplayItems: (String, List<String>) -> Unit,
+    setTabDisplayItems: (String, List<BuildDataItem>) -> Unit,
 ): Job? {
     if (appState == AppState.LOADING) return null
     setAppState(AppState.LOADING)
@@ -38,7 +38,7 @@ internal fun reloadData(
 
         // 2. Display the data
         branches.forEach { branch ->
-            lastNBuildsMetadata[branch]?.map { it.id }?.let {
+            lastNBuildsMetadata[branch]?.let {
                 setTabDisplayItems(branch, it)
             } ?: setTabDisplayItems(branch, emptyList())
         }
@@ -55,10 +55,18 @@ suspend fun getMetadataOnLastNBuilds(repoId: String, branches: List<String>, num
         branches.associateWith { branch ->
             async {
                 //log.debug("Loading metadata for branch $branch")
-                cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.map {
-                    PendingBuildData(id = it.node.id, buildCreatedTimestamp = it.node.buildCreatedTimestamp)
-                }.sortedByDescending {
-                    it.buildCreatedTimestamp
+                cirrusData.getLastPeachBuildsMetadata(repoId, branch, numberOfBuildsToLoad).edges.sortedByDescending {
+                    it.node.buildCreatedTimestamp
+                }.fold(mutableListOf<PendingBuildData>()) { acc, buildEdge ->
+                    acc.apply {
+                        add(
+                            PendingBuildData(
+                                id = buildEdge.node.id,
+                                buildCreatedTimestamp = buildEdge.node.buildCreatedTimestamp,
+                                previousBuild = acc.lastOrNull()?.id
+                            )
+                        )
+                    }
                 }
             }
         }.mapValues { (_, deferred) ->

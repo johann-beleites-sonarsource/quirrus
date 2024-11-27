@@ -1,6 +1,7 @@
 package com.sonarsource.dev.quirrus.wallboard
 
 internal class BuildDataManager(
+    private val getBuildData: (String) -> BuildDataItem?,
     private val updateState: (AppState) -> Unit,
     private val updateBuildData: (BuildDataItem) -> Unit
 ) {
@@ -8,7 +9,7 @@ internal class BuildDataManager(
     private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
 
     private val fetchingAssistant
-        get() = backgroundFetchingAssistant ?: BackgroundFetchingAssistant(updateBuildData) { updateState(AppState.NONE) }.also {
+        get() = backgroundFetchingAssistant ?: BackgroundFetchingAssistant(getBuildData, updateBuildData) { updateState(AppState.NONE) }.also {
             backgroundFetchingAssistant = it
         }
 

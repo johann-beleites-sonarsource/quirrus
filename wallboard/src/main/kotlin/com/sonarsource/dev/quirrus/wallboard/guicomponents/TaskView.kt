@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.sonarsource.dev.quirrus.wallboard.BuildDataItem
+import com.sonarsource.dev.quirrus.wallboard.LoadedBuildData
 import com.sonarsource.dev.quirrus.wallboard.TaskMetadata
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import com.sonarsource.dev.quirrus.wallboard.data.TaskDiffData
@@ -39,11 +39,11 @@ private val dateTimeFormat = SimpleDateFormat("dd.MM.yyy HH:mm", Locale.getDefau
 
 @Composable
 fun TaskList(
-    displayItem: BuildDataItem,
+    displayItem: LoadedBuildData,
     verticalScrollState: ScrollState,
     tasksWithDiffs: Map<String, TaskDiffData?>
 ) {
-    val (completed, failed) = displayItem.tasksByStatus.entries
+    val (completed, failed) = displayItem.rerunsByStatus.entries
         .flatMap { (status, tasks) ->
             tasks.map { status to it }
                 .sortedBy { (_, task) ->
@@ -81,7 +81,7 @@ fun TaskList(
                                         color = Color.Black//MaterialTheme.colors.onError
                                     )
 
-                                    SinceText(displayItem.taskMetadata[task.name]!!, Color.Black/*MaterialTheme.colors.onError*/)
+                                    SinceText(displayItem.metadataByName[task.name]!!, Color.Black/*MaterialTheme.colors.onError*/)
                                 }
                             }
 
@@ -193,7 +193,7 @@ fun TaskList(
                         color = MaterialTheme.colors.onSecondary
                     )
 
-                    SinceText(displayItem.taskMetadata[task.first().name]!!, MaterialTheme.colors.onSecondary)
+                    SinceText(displayItem.metadataByName[task.first().name]!!, MaterialTheme.colors.onSecondary)
                 }
             }
         }
@@ -210,7 +210,7 @@ fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
     taskMetadata.lastBuildWithDifferentStatus?.let { lastDifferentBuild ->
         val text = AnnotatedString.Builder().apply {
             pushStyle(MaterialTheme.typography.body2.toSpanStyle().copy(fontWeight = FontWeight.Light, color = color))
-            append("since build ${lastDifferentBuild.id} (${dateTimeFormat.format(lastDifferentBuild.buildCreatedTimestamp)})")
+            append("since build $lastDifferentBuild ${taskMetadata.lastBuildWithDifferentStatusTimestamp?.let { "(${dateTimeFormat.format(it)})" } ?: ""}")
         }.toAnnotatedString()
 
         ClickableText(
@@ -219,8 +219,7 @@ fun BoxScope.SinceText(taskMetadata: TaskMetadata, color: Color) {
                 .align(Alignment.CenterEnd)
                 .pointerHoverIcon(PointerIcon.Hand),
         ) {
-            val taskName = taskMetadata.reruns.first().name
-            lastDifferentBuild.taskMetadata[taskName]?.reruns?.firstOrNull()?.let { task ->
+            taskMetadata.reruns.firstOrNull()?.let { task ->
                 openWebpage(URI("https://cirrus-ci.com/task/${task.id}"))
             }
         }

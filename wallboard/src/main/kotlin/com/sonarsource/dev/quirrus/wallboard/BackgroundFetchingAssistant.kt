@@ -1,6 +1,5 @@
 package com.sonarsource.dev.quirrus.wallboard
 
-import com.sonarsource.dev.quirrus.wallboard.data.DataItemState
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -9,6 +8,7 @@ import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import java.util.concurrent.atomic.AtomicInteger
 
 class BackgroundFetchingAssistant(
+    private val getBuildData: (String) -> BuildDataItem?,
     private val updateBuildData: (BuildDataItem) -> Unit,
     private val doneHandler: () -> Unit
 ) {
@@ -16,7 +16,11 @@ class BackgroundFetchingAssistant(
     private lateinit var worker: Worker
     private val toProcess = AtomicInteger(0)
 
-    private class Worker(updateBuildData: (BuildDataItem) -> Unit, doneHandler: () -> Unit) {
+    private class Worker(
+        private val getBuildData: (String) -> BuildDataItem?,
+        private val updateBuildData: (BuildDataItem) -> Unit,
+        private val doneHandler: () -> Unit,
+    ) {
         val buildsToFetch = Channel<PendingBuildData>()
         private val dataToDisplay = Channel<Pair<LoadingBuildData, Build>>()
 
@@ -33,15 +37,28 @@ class BackgroundFetchingAssistant(
 
         private val dataDisplayJob = GlobalScope.launch {
             dataToDisplay.consumeEach { (displayItem, build) ->
-                LoadedBuildData(
-                    id = displayItem.id,
-                    buildCreatedTimestamp = displayItem.buildCreatedTimestamp,
+                val reference = displayItem.getReference() // TODO: thread safety
+
+                LoadedBuildData.from(
+                    pending = displayItem,
                     build = build,
+                    reference = reference,
                 ).let(updateBuildData)
 
                 doneHandler()
             }
         }
+
+        private fun BuildDataItem.getReference(): LoadedBuildData? {
+            val previousBuildNode = previousBuild?.let { getBuildData(it) }
+            return when (previousBuildNode) {
+                is LoadedBuildData ->
+                    if (previousBuildNode.shouldBeUsedAsReference()) previousBuildNode
+                    else previousBuildNode.getReference()
+                else -> null
+            }
+        }
+
 
         fun cancel() {
             buildFetcherBackgroundJob.cancel()
@@ -52,10 +69,10 @@ class BackgroundFetchingAssistant(
     }
 
     suspend fun start(dataItems: List<PendingBuildData>) {
-        check (toProcess.get() <= 0) { "Already processing" }
+        check(toProcess.get() <= 0) { "Already processing" }
 
         toProcess.set(dataItems.size)
-        worker = Worker(updateBuildData) {
+        worker = Worker(getBuildData, updateBuildData) {
             if (toProcess.decrementAndGet() <= 0) {
                 doneHandler()
             }

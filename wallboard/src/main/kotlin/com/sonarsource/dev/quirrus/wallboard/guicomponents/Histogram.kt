@@ -23,6 +23,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.BuildDataItem
+import com.sonarsource.dev.quirrus.wallboard.LoadedBuildData
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.jetbrains.skia.Font
 import org.jetbrains.skia.Paint
@@ -67,23 +68,23 @@ fun Histogram(
             val maxY = size.height - 20f
 
             // TODO: filter out successful tasks
-            /*val filteredTaskHistoryWithBuildNode = taskHistoryWithBuildNode.map { (buildNode, categorizedTasks) ->
+            /*val displayItems = displayItemsAll.filterIsInstance<LoadedBuildData>().filter {
                 buildNode to categorizedTasks.filter { (status, _) ->
                     status.new || status.status != StatusCategory.COMPLETED
                 }
             }*/
 
-            val maxFailed = displayItems.maxOf { displayItem ->
-                displayItem.tasksByStatus.filter { (status, _) ->
+            val maxFailed = displayItems.filterIsInstance<LoadedBuildData>().maxOfOrNull { displayItem ->
+                displayItem.rerunsByStatus.filter { (status, _) ->
                     status.status.isFailingState()
                 }.values.sumOf { it.size }
-            }
+            } ?: 0
 
-            val maxNotFailed = displayItems.maxOf { displayItem ->
-                displayItem.tasksByStatus.filter { (status, _) ->
+            val maxNotFailed = displayItems.filterIsInstance<LoadedBuildData>().maxOfOrNull { displayItem ->
+                displayItem.rerunsByStatus.filter { (status, _) ->
                     !status.status.isFailingState() && !(status.status == StatusCategory.COMPLETED && !status.new)
                 }.values.sumOf { it.size }
-            }
+            } ?: 0
 
             val total = maxFailed + maxNotFailed
 
@@ -105,8 +106,8 @@ fun Histogram(
                 end = Offset(x = maxX, y = zeroYOffset),
             )
 
-            displayItems.forEachIndexed { i, displayItem ->
-                displayItem.tasksByStatus.map { (status, tasks) ->
+            displayItems.filterIsInstance<LoadedBuildData>().forEachIndexed { i, displayItem ->
+                displayItem.rerunsByStatus.map { (status, tasks) ->
                     status to tasks.count()
                 }.partition { (status, _) ->
                     status.status.isFailingState()

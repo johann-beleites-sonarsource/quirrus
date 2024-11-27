@@ -8,19 +8,22 @@ import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 
 typealias TaskReruns = List<org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task>
 
-interface BuildDataItem {
+sealed interface BuildDataItem {
     val id: ID
     val buildCreatedTimestamp: Long
+    val previousBuild: String?
 }
 
 data class PendingBuildData(
     override val id: ID,
     override val buildCreatedTimestamp: Long,
+    override val previousBuild: String?,
 ) : BuildDataItem
 
 data class LoadingBuildData(
     override val id: ID,
     override val buildCreatedTimestamp: Long,
+    override val previousBuild: String? = null,
 ) : BuildDataItem {
     companion object {
         fun from(pending: PendingBuildData) = LoadingBuildData(pending.id, pending.buildCreatedTimestamp)
@@ -30,23 +33,25 @@ data class LoadingBuildData(
 data class FailedBuildData(
     override val id: ID,
     override val buildCreatedTimestamp: Long,
+    override val previousBuild: String?,
 ) : BuildDataItem
 
 data class LoadedBuildData(
     override val id: ID,
     override val buildCreatedTimestamp: Long,
+    override val previousBuild: String?,
     val build: Build,
     val rerunsByStatus: Map<Status, List<TaskReruns>>,
     val metadataByName: Map<String, TaskMetadata>,
 ) : BuildDataItem {
 
     companion object {
-        fun from(pending: PendingBuildData, build: Build, reference: LoadedBuildData?) : LoadedBuildData {
+        fun from(pending: LoadingBuildData, build: Build, reference: LoadedBuildData?): LoadedBuildData {
             val reruns: Map<String, TaskReruns> = build.tasks.groupBy {
                 it.name
-            }?.mapValues {
+            }.mapValues {
                 it.value.sortedByDescending { run -> run.creationTimestamp }
-            } ?: return
+            }
 
             val metadataByName = mutableMapOf<String, TaskMetadata>()
             val rerunsByStatus = mutableMapOf<Status, MutableList<TaskReruns>>()
@@ -54,7 +59,12 @@ data class LoadedBuildData(
             if (reference == null) {
                 reruns.forEach { (name, reruns) ->
                     val status = Status(StatusCategory.ofCirrusTask(reruns.first()), false)
-                    metadataByName[name] = TaskMetadata(status, null, reruns)
+                    metadataByName[name] = TaskMetadata(
+                        status = status,
+                        lastBuildWithDifferentStatus = null,
+                        lastBuildWithDifferentStatusTimestamp = null,
+                        reruns = reruns
+                    )
                     rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
                 }
             } else {
@@ -65,19 +75,29 @@ data class LoadedBuildData(
                     val isStatusNew = shouldBeUsedAsReference && referenceMetadata?.status?.status?.let { it != statusCategory } ?: false
                     val status = Status(statusCategory, isStatusNew)
 
-                    val lastDifferentBuild = if (isStatusNew) reference else referenceMetadata?.lastBuildWithDifferentStatus
-                    metadataByName[name] = TaskMetadata(status, lastDifferentBuild, reruns)
+                    val (lastDifferentBuild, lastDifferentTimestamp) = if (isStatusNew) {
+                        reference.id to reference.buildCreatedTimestamp
+                    } else {
+                        referenceMetadata?.lastBuildWithDifferentStatus to referenceMetadata?.lastBuildWithDifferentStatusTimestamp
+                    }
+
+                    metadataByName[name] = TaskMetadata(status, lastDifferentBuild, lastDifferentTimestamp, reruns)
                     rerunsByStatus.computeIfAbsent(status) { mutableListOf() }.add(reruns)
                 }
             }
 
-            return LoadedBuildData(pending.id, pending.buildCreatedTimestamp, build, rerunsByStatus, metadataByName)
+            return LoadedBuildData(pending.id, pending.buildCreatedTimestamp, pending.previousBuild, build, rerunsByStatus, metadataByName)
         }
-
-        private fun LoadedBuildData?.shouldBeUsedAsReference() =
-            this?.build?.tasks?.any { it.status !in listOf(TaskStatus.SKIPPED, TaskStatus.ABORTED) } ?: true
     }
 
 }
 
-data class TaskMetadata(var status: Status, var lastBuildWithDifferentStatus: BuildDataItem?, var reruns: TaskReruns)
+internal fun BuildDataItem?.shouldBeUsedAsReference() =
+    this is LoadedBuildData && this.build.tasks.any { it.status !in listOf(TaskStatus.SKIPPED, TaskStatus.ABORTED) }
+
+data class TaskMetadata(
+    var status: Status,
+    var lastBuildWithDifferentStatus: String?,
+    var lastBuildWithDifferentStatusTimestamp: Long?,
+    var reruns: TaskReruns,
+)
