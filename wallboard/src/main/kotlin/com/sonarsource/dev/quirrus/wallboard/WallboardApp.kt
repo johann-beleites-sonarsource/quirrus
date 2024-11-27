@@ -58,7 +58,6 @@ internal enum class AppState {
 
 private const val numberOfBuildsToLoad = 10
 private var refreshJob: Job? = null
-private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
 private lateinit var buildDataManager: BuildDataManager
 
 @Composable
@@ -91,10 +90,11 @@ fun WallboardApp() {
 
     if (!::buildDataManager.isInitialized) {
         buildDataManager = BuildDataManager(
+            { branch -> displayItems[branch] },
             { id -> displayItemDirectory[id] },
             { state = it },
         ) {
-            displayItemDirectory[it.id] = it
+            displayItemDirectory[it.baseInfo.id] = it
         }
     }
 
@@ -160,8 +160,8 @@ fun WallboardApp() {
                     buildDataManager,
                     { state = it; loadingCancelled = false },
                     { branch, builds ->
-                        displayItems[branch] = mutableStateListOf(*builds.map { it.id }.toTypedArray())
-                        displayItemDirectory.putAll(builds.associateBy { it.id })
+                        displayItems[branch] = mutableStateListOf(*builds.map { it.baseInfo.id }.toTypedArray())
+                        displayItemDirectory.putAll(builds.associateBy { it.baseInfo.id })
                         branchState[branch] = AppState.NONE
                     },
                 )?.let {
@@ -414,7 +414,7 @@ fun WallboardApp() {
                                                 amountSucceeded,
                                                 amountFailed,
                                                 totalAmount,
-                                                selectedTasks.buildCreatedTimestamp,
+                                                selectedTasks.baseInfo.buildCreatedTimestamp,
                                                 backgroundLoadingInProgress,
                                             )
                                         }

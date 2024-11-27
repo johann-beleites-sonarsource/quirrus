@@ -29,7 +29,7 @@ class BackgroundFetchingAssistant(
                 launch {
                     LoadingBuildData.from(displayItem).let {
                         updateBuildData(it)
-                        dataToDisplay.send(it to cirrusData.getTasksOfSingleBuild(it.id))
+                        dataToDisplay.send(it to cirrusData.getTasksOfSingleBuild(it.baseInfo.id))
                     }
                 }
             }
@@ -50,7 +50,7 @@ class BackgroundFetchingAssistant(
         }
 
         private fun BuildDataItem.getReference(): LoadedBuildData? {
-            val previousBuildNode = previousBuild?.let { getBuildData(it) }
+            val previousBuildNode = baseInfo.previousBuild?.let { getBuildData(it) }
             return when (previousBuildNode) {
                 is LoadedBuildData ->
                     if (previousBuildNode.shouldBeUsedAsReference()) previousBuildNode

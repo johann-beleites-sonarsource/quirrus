@@ -44,7 +44,7 @@ internal fun reloadData(
         }
 
         // 3. launch the loading of the full build data for each build ID. Loading the data can take some time for builds with many tasks.
-        lastNBuildsMetadata.values.flatten().sortedByDescending { it.buildCreatedTimestamp }.let {
+        lastNBuildsMetadata.values.flatten().sortedByDescending { it.baseInfo.buildCreatedTimestamp }.let {
             buildDataManager.load(it)
         }
     }
@@ -61,9 +61,12 @@ suspend fun getMetadataOnLastNBuilds(repoId: String, branches: List<String>, num
                     acc.apply {
                         add(
                             PendingBuildData(
-                                id = buildEdge.node.id,
-                                buildCreatedTimestamp = buildEdge.node.buildCreatedTimestamp,
-                                previousBuild = acc.lastOrNull()?.id
+                                InitialBuildData(
+                                    id = buildEdge.node.id,
+                                    branch = branch,
+                                    buildCreatedTimestamp = buildEdge.node.buildCreatedTimestamp,
+                                    previousBuild = acc.lastOrNull()?.baseInfo?.id
+                                )
                             )
                         )
                     }
