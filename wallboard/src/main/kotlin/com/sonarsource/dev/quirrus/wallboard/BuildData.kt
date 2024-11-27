@@ -27,7 +27,7 @@ data class LoadingBuildData(
     override val baseInfo: InitialBuildData
 ) : BuildDataItem {
     companion object {
-        fun from(pending: PendingBuildData) = LoadingBuildData(pending.baseInfo)
+        fun from(pending: BuildDataItem) = LoadingBuildData(pending.baseInfo)
     }
 }
 

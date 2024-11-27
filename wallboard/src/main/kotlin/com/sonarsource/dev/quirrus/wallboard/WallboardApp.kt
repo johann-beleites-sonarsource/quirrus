@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.Checkbox
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -43,6 +44,7 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.Label
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.ListTitle
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
+import com.sonarsource.dev.quirrus.wallboard.guicomponents.TabTitle
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
@@ -81,8 +83,7 @@ fun WallboardApp() {
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
     var autoRefresh by remember { mutableStateOf(WallboardConfig.autoRefreshEnabled) }
-    var backgroundRefreshCounter by remember { mutableStateOf(0L) }
-    var backgroundLoadingInProgress by remember { mutableStateOf(false) }
+    val backgroundLoadingInProgress by remember { mutableStateOf(mutableStateMapOf<String, Boolean>()) }
     val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
     val branchState by remember { mutableStateOf(mutableStateMapOf<String, AppState>()) }
     val errors by remember { mutableStateOf(mutableStateMapOf<String, String>()) }
@@ -182,52 +183,26 @@ fun WallboardApp() {
         }
     }*/ // FIXME
 
-    /*fun startBackgroundRefreshPoll() {
-        val branch = selectedTab ?: return
-        launchBackgroundRefreshPoll(
-            backgroundRefreshCounter,
-            { backgroundRefreshCounter },
-            branch,
-            repoTextFieldVal,
-            { state },
-            { backgroundLoadingInProgress = it },
-        ) {
-            it.entries.forEach { (branch, newData) ->
-                if (newData != null && newData.isNotEmpty()) {
-                    val mutableData = newData.toMutableList()
-                    lastTasks[branch] = ((lastTasks[branch] ?: emptyList()).map { oldBuild ->
-                        val newDataIndex = mutableData.indexOfFirst { it.node.id == oldBuild.node.id }
-                        return@map if (newDataIndex >= 0) {
-                            val toReturn = mutableData[newDataIndex]
-                            mutableData.removeAt(newDataIndex)
-                            toReturn
-                        } else {
-                            oldBuild
-                        }
-                    } + mutableData).sortedByDescending { build ->
-                        build.node.changeTimestamp
-                    }
-                }
+    fun triggerAutoRefresh() {
+        if (autoRefresh) {
+            buildDataManager.startBackgroundRefreshPoll(branches) { branch: String, loading: Boolean ->
+                backgroundLoadingInProgress[branch] = loading
             }
+        } else {
+            buildDataManager.stopBackgroundRefreshPoll()
+            backgroundLoadingInProgress.clear()
         }
     }
 
     fun changeAutoReloadSetting() {
         autoRefresh = !autoRefresh
-        backgroundRefreshCounter++
-        if (autoRefresh) {
-            startBackgroundRefreshPoll()
-        }
+        triggerAutoRefresh()
         saveConfig()
     }
-*/
-    /*if (selectedTab != null && lastSelectedTab != selectedTab) {
-        if (autoRefresh) {
-            backgroundRefreshCounter++
-            startBackgroundRefreshPoll()
-        }
-        lastSelectedTab = selectedTab
-    }*/
+
+    if (autoRefresh && !buildDataManager.isBackgroundRefreshPollRunning() && state != AppState.INIT) {
+        triggerAutoRefresh()
+    }
 
     MaterialTheme {
         Box {
@@ -345,7 +320,7 @@ fun WallboardApp() {
                         )
                     }
 
-                    /*Row(
+                    Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, end = 5.dp, top = 5.dp)
@@ -354,11 +329,13 @@ fun WallboardApp() {
                     ) {
                         Checkbox(
                             checked = autoRefresh,
-                            enabled = lastTasks.isNotEmpty(),
+                            enabled = displayItems[selectedTab]?.firstOrNull()
+                                ?.let { buildId -> displayItemDirectory[buildId] is LoadedBuildData }
+                                ?: false,
                             onCheckedChange = { changeAutoReloadSetting() },
                         )
                         Text("Auto-refresh")
-                    }*/
+                    }
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
@@ -415,8 +392,10 @@ fun WallboardApp() {
                                                 amountFailed,
                                                 totalAmount,
                                                 selectedTasks.baseInfo.buildCreatedTimestamp,
-                                                backgroundLoadingInProgress,
+                                                backgroundLoadingInProgress[selectedTab] ?: false,
                                             )
+                                        } else {
+                                            TabTitle("Loading jobs for $selectedTab...")
                                         }
 
                                         Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
