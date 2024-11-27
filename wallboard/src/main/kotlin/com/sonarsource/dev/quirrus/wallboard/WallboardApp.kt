@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.Checkbox
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -70,14 +71,14 @@ fun WallboardApp() {
     var repoTextFieldVal by remember { mutableStateOf(repo) }
     var clickPosition by remember { mutableStateOf(-1f) }
     val taskListScrollState = rememberScrollState(0)
-    //var autoRefresh by remember { mutableStateOf(autoRefreshEnabled) }
-    var autoRefresh = false
+    var autoRefresh by remember { mutableStateOf(WallboardConfig.autoRefreshEnabled) }
     var backgroundRefreshCounter by remember { mutableStateOf(0L) }
     var lastSelectedTab: String? by remember { mutableStateOf(null) }
     var backgroundLoadingInProgress by remember { mutableStateOf(false) }
     val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
     val branchState by remember { mutableStateOf(mutableStateMapOf<String, AppState>()) }
     val errors by remember { mutableStateOf(mutableStateMapOf<String, String>()) }
+    var loadingCancelled by remember { mutableStateOf(false) }
 
     fun saveConfig() {
         with(WallboardConfig) {
@@ -89,27 +90,33 @@ fun WallboardApp() {
     }
 
     fun triggerReload() {
-        lastTasks.clear()
-        lastTasks.putAll(branches.map { it to null })
-        branchState.clear()
-        branchState.putAll(branches.map { it to AppState.LOADING })
-        if (selectedTab !in branches) {
-            selectedTab = branches.firstOrNull()
+        if (state == AppState.LOADING) {
+            // Cancel
+            loadingCancelled = true
+        } else {
+            lastTasks.clear()
+            lastTasks.putAll(branches.map { it to null })
+            branchState.clear()
+            branchState.putAll(branches.map { it to AppState.LOADING })
+            if (selectedTab !in branches) {
+                selectedTab = branches.firstOrNull()
+            }
+            reloadData(
+                state,
+                repoTextFieldVal,
+                branches,
+                selectedTab,
+                lastTasks,
+                { state = it ; loadingCancelled = false },
+                { error = it },
+                { repoTextFieldVal = it },
+                { selectedTab = it },
+                { saveConfig() },
+                { branch, state -> branchState[branch] = state },
+                { branch, error -> errors[branch] = error },
+                { loadingCancelled },
+            )
         }
-        reloadData(
-            state,
-            repoTextFieldVal,
-            branches,
-            selectedTab,
-            lastTasks,
-            { state = it },
-            { error = it },
-            { repoTextFieldVal = it },
-            { selectedTab = it },
-            { saveConfig() },
-            { branch, state -> branchState[branch] = state },
-            { branch, error -> errors[branch] = error }
-        )
     }
 
     DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs).let {
@@ -125,10 +132,25 @@ fun WallboardApp() {
             { backgroundRefreshCounter },
             branch,
             repoTextFieldVal,
+            { state },
             { backgroundLoadingInProgress = it },
         ) {
-            it.entries.forEach { (branch, data) ->
-                if (data != null) lastTasks[branch] = data
+            it.entries.forEach { (branch, newData) ->
+                if (newData != null && newData.isNotEmpty()) {
+                    val mutableData = newData.toMutableList()
+                    lastTasks[branch] = ((lastTasks[branch] ?: emptyList()).map { oldBuild ->
+                        val newDataIndex = mutableData.indexOfFirst { it.node.id == oldBuild.node.id }
+                        return@map if (newDataIndex >= 0) {
+                            val toReturn = mutableData[newDataIndex]
+                            mutableData.removeAt(newDataIndex)
+                            toReturn
+                        } else {
+                            oldBuild
+                        }
+                    } + mutableData).sortedByDescending { build ->
+                        build.node.changeTimestamp
+                    }
+                }
             }
         }
     }
@@ -218,8 +240,14 @@ fun WallboardApp() {
                         .align(Alignment.CenterHorizontally)
                         .padding(start = 5.dp, end = 5.dp, top = 5.dp)
                         .fillMaxWidth()
-                        .clickable(enabled = state != AppState.LOADING) { triggerReload() }
-                        .background(color = if (state != AppState.LOADING) MaterialTheme.colors.secondary else Color.LightGray),
+                        .clickable(enabled = state in listOf(AppState.LOADING, AppState.NONE) && !loadingCancelled) { triggerReload() }
+                        .background(color = if (state != AppState.LOADING) {
+                            MaterialTheme.colors.secondary
+                        } else if (!loadingCancelled) {
+                            Color.Red.copy(alpha = .3f)
+                        } else {
+                            Color.LightGray
+                        }),
                         horizontalArrangement = Arrangement.Center
                     ) {
                         if (state != AppState.LOADING) {
@@ -230,10 +258,15 @@ fun WallboardApp() {
                                 tint = MaterialTheme.colors.onSecondary
                             )
                         } else {
-                            CircularProgressIndicator(
-                                modifier = Modifier.align(alignment = Alignment.CenterVertically)
-                                    .scale(.6f)
-                            )
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Row {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.scale(.6f)
+                                    )
+                                    val text = if (loadingCancelled) "Canceling" else "Cancel"
+                                    Text(text, modifier = Modifier.align(Alignment.CenterVertically))
+                                }
+                            }
                         }
                     }
 
@@ -252,7 +285,7 @@ fun WallboardApp() {
                         )
                     }
 
-                    /*Row(
+                    Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .padding(start = 5.dp, end = 5.dp, top = 5.dp)
@@ -265,7 +298,7 @@ fun WallboardApp() {
                             onCheckedChange = { changeAutoReloadSetting() },
                         )
                         Text("Auto-refresh")
-                    }*/
+                    }
                 }
 
                 Column(modifier = Modifier.weight(0.9f)) {
@@ -290,39 +323,47 @@ fun WallboardApp() {
                                         0
                                     }
 
-                                    val selectedTasks = taskHistory[clickedIndex]
-                                    val amountFailed = selectedTasks.second.filter {
-                                        it.key.status.isFailingState()
-                                    }.map {
-                                        it.value.size
-                                    }.sum()
-                                    val amountSucceeded = selectedTasks.second.filter {
-                                        it.key.status == StatusCategory.COMPLETED
-                                    }.map {
-                                        it.value.size
-                                    }.sum()
-                                    val totalAmount = selectedTasks.second.map {
-                                        it.value.size
-                                    }.sum()
-
-
-                                    ListTitle(
-                                        "$selectedTab Peach Jobs",
-                                        amountSucceeded,
-                                        amountFailed,
-                                        totalAmount,
-                                        selectedTasks.first.buildCreatedTimestamp,
-                                        backgroundLoadingInProgress,
-                                    )
-
-                                    Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
-                                        Histogram(taskHistory, clickedIndex) {
-                                            clickPosition = it
+                                    if (taskHistory.isEmpty()) {
+                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Text("No data available", color = MaterialTheme.colors.error, fontWeight = FontWeight.Bold)
                                         }
-                                    }
+                                        // return@let -- this creates a compilation runtime error. so instead we have an else clause
+                                    } else {
 
-                                    Row(modifier = Modifier.weight(0.6f)) {
-                                        TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                        val selectedTasks = taskHistory[clickedIndex]
+                                        val amountFailed = selectedTasks.second.filter {
+                                            it.key.status.isFailingState()
+                                        }.map {
+                                            it.value.size
+                                        }.sum()
+                                        val amountSucceeded = selectedTasks.second.filter {
+                                            it.key.status == StatusCategory.COMPLETED
+                                        }.map {
+                                            it.value.size
+                                        }.sum()
+                                        val totalAmount = selectedTasks.second.map {
+                                            it.value.size
+                                        }.sum()
+
+
+                                        ListTitle(
+                                            "$selectedTab Peach Jobs",
+                                            amountSucceeded,
+                                            amountFailed,
+                                            totalAmount,
+                                            selectedTasks.first.buildCreatedTimestamp,
+                                            backgroundLoadingInProgress,
+                                        )
+
+                                        Row(modifier = Modifier.weight(0.4f).padding(vertical = 5.dp)) {
+                                            Histogram(taskHistory, clickedIndex) {
+                                                clickPosition = it
+                                            }
+                                        }
+
+                                        Row(modifier = Modifier.weight(0.6f)) {
+                                            TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                        }
                                     }
                                 }
                             }
