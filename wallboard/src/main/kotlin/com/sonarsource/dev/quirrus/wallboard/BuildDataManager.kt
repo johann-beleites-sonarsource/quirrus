@@ -1,5 +1,10 @@
 package com.sonarsource.dev.quirrus.wallboard
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 internal class BuildDataManager(
     private val getBuildsPerBranch: (String) -> List<String>?,
     private val getBuildData: (String) -> BuildDataItem?,
@@ -7,11 +12,12 @@ internal class BuildDataManager(
     private val updateBuildDataDirectory: (BuildDataItem) -> Unit
 ) {
 
-    private var backgroundFetchingAssistant: BackgroundFetchingAssistant? = null
+    private var asyncFetchingAssistant: AsyncFetchingAssistant? = null
+    private var backgroundAutoRefreshJob: Job? = null
 
     private val fetchingAssistant
-        get() = backgroundFetchingAssistant ?: BackgroundFetchingAssistant(getBuildData, ::updateBuildData) { updateState(AppState.NONE) }.also {
-            backgroundFetchingAssistant = it
+        get() = asyncFetchingAssistant ?: AsyncFetchingAssistant(getBuildData, ::updateBuildData) { updateState(AppState.NONE) }.also {
+            asyncFetchingAssistant = it
         }
 
     private fun updateBuildData(buildDataItem: BuildDataItem) {
@@ -35,11 +41,41 @@ internal class BuildDataManager(
     }
 
     fun cancel() {
-        backgroundFetchingAssistant?.cancel()
-        backgroundFetchingAssistant = null
+        asyncFetchingAssistant?.cancel()
+        asyncFetchingAssistant = null
     }
 
     suspend fun load(buildDataItems: List<PendingBuildData>) {
         fetchingAssistant.start(buildDataItems)
     }
+
+    fun startBackgroundRefreshPoll(branches: List<String>, setLoadingStatus: (String, Boolean) -> Unit) {
+        stopBackgroundRefreshPoll()
+        backgroundAutoRefreshJob = GlobalScope.launch {
+            while (true) {
+                branches.forEach { branch ->
+                    getBuildsPerBranch(branch)?.firstOrNull()?.let { buildId ->
+                        getBuildData(buildId) as? LoadedBuildData
+                    }?.let {
+                        setLoadingStatus(branch, true)
+                        reload(it) {
+                            setLoadingStatus(branch, false)
+                        }
+                    }
+                }
+                delay(20_000)
+            }
+        }
+    }
+
+    fun stopBackgroundRefreshPoll() {
+        backgroundAutoRefreshJob?.cancel()
+        backgroundAutoRefreshJob = null
+    }
+
+    private fun reload(buildData: LoadedBuildData, doneHandler: () -> Unit) {
+        fetchingAssistant.reload(buildData, doneHandler)
+    }
+
+    fun isBackgroundRefreshPollRunning() = backgroundAutoRefreshJob != null
 }

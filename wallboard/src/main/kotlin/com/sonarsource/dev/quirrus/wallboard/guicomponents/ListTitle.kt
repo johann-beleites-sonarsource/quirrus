@@ -53,3 +53,24 @@ fun ListTitle(
             .padding(bottom = 5.dp)
     )
 }
+
+@Composable
+fun TabTitle(text: String) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AnnotatedString.Builder().apply {
+            pushStyle(MaterialTheme.typography.h4.toSpanStyle())
+            append(text)
+
+        }.toAnnotatedString().let {
+            Text(it)
+        }
+    }
+
+    Divider(
+        modifier = Modifier
+            .height(1.dp)
+            .fillMaxWidth()
+            .background(color = MaterialTheme.colors.primary)
+            .padding(bottom = 5.dp)
+    )
+}

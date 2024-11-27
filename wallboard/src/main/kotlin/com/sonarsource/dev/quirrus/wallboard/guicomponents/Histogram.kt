@@ -62,17 +62,10 @@ fun Histogram(
             .background(Color.LightGray)
     ) {
         Canvas(
-            modifier = Modifier.fillMaxSize()/*.then(hoverable)*/.then(pointerInput).pointerHoverIcon(PointerIcon.Hand)
+            modifier = Modifier.fillMaxSize().then(hoverable).then(pointerInput).pointerHoverIcon(PointerIcon.Hand)
         ) {
             maxX = size.width
             val maxY = size.height - 20f
-
-            // TODO: filter out successful tasks
-            /*val displayItems = displayItemsAll.filterIsInstance<LoadedBuildData>().filter {
-                buildNode to categorizedTasks.filter { (status, _) ->
-                    status.new || status.status != StatusCategory.COMPLETED
-                }
-            }*/
 
             val maxFailed = displayItems.filterIsInstance<LoadedBuildData>().maxOfOrNull { displayItem ->
                 displayItem.rerunsByStatus.filter { (status, _) ->
