@@ -107,7 +107,10 @@ fun Histogram(
             )
 
             displayItems.filterIsInstance<LoadedBuildData>().forEachIndexed { i, displayItem ->
-                displayItem.rerunsByStatus.map { (status, tasks) ->
+                displayItem.rerunsByStatus.filter { (status, _) ->
+                    // Don't display successful tasks that have been successful for a while
+                    status.status != StatusCategory.COMPLETED || status.new
+                }.map { (status, tasks) ->
                     status to tasks.count()
                 }.partition { (status, _) ->
                     status.status.isFailingState()
@@ -138,7 +141,7 @@ fun Histogram(
                         top + height
                     }
 
-                    val creationDate = Date(displayItem.buildCreatedTimestamp)
+                    val creationDate = Date(displayItem.baseInfo.buildCreatedTimestamp)
                     drawText(dateOnly.format(creationDate), left, maxY + 2f)
                     drawText(timeOnly.format(creationDate), left, maxY + 17f)
                 }
