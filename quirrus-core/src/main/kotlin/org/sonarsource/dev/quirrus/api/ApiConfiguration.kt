@@ -76,7 +76,8 @@ class ApiConfiguration(
                 }
             }.await()
         }.onFailure { e ->
-            logger?.error("Failed to send GraphQL request: ${e.message}")
+            logger?.error("Failed to send GraphQL request: ${e.message}. Request:\n$request")
+            throw ApiException("Failed to send GraphQL request: ${e.message}")
         }.getOrNull() ?: throw ApiException("Failed to send GraphQL request")
     }
 

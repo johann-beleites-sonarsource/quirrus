@@ -26,15 +26,24 @@ class AsyncFetchingAssistant(
 
         private val buildsToFetch = Channel<LoadTask>()
         private val dataToDisplay = Channel<LoadedData>()
-
+        private val counter = AtomicInteger(0)
         private val buildFetcherBackgroundJob = GlobalScope.launch {
             buildsToFetch.consumeEach { (displayItem, doneHandler) ->
                 launch {
-                    LoadingBuildData.from(displayItem).let {
-                        updateBuildData(it)
-                        dataToDisplay.send(LoadedData(it, cirrusData.getTasksOfSingleBuild(it.baseInfo.id), doneHandler))
+                    println("launching fetch for ${displayItem.baseInfo.id}")
+                    kotlin.runCatching {
+                        LoadingBuildData.from(displayItem).let {
+                            updateBuildData(it)
+                            dataToDisplay.send(LoadedData(it, cirrusData.getTasksOfSingleBuild(it.baseInfo.id), doneHandler))
+                            println("fetched build data for ${displayItem.baseInfo.id}")
+                        }
+                    }.onFailure { e ->
+                        FailedBuildData(displayItem.baseInfo, e.message).let(updateBuildData)
+                        doneHandler()
+                        println("Failed to fetch build data for ${displayItem.baseInfo.id}: ${e.message}")
                     }
                 }
+
             }
         }
 

@@ -19,6 +19,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -410,6 +411,32 @@ fun WallboardApp() {
                                         Row(modifier = Modifier.weight(0.6f)) {
                                             if (selectedTasks is LoadedBuildData) {
                                                 TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                            } else if (selectedTasks is FailedBuildData) {
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Column {
+                                                        Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                                                            @Composable fun icon() = Icon(
+                                                                Icons.Outlined.Warning,
+                                                                contentDescription = "Error",
+                                                                tint = MaterialTheme.colors.error,
+                                                                modifier = Modifier.padding(horizontal = 10.dp),
+                                                            )
+
+                                                            icon()
+                                                            Text(
+                                                                "Error loading data for ${selectedTasks.baseInfo.id}",
+                                                                color = MaterialTheme.colors.error,
+                                                                fontWeight = FontWeight.Bold,
+                                                            )
+                                                            icon()
+                                                        }
+                                                        Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                                                            selectedTasks.errorMsg?.let {
+                                                                Text(it, color = MaterialTheme.colors.error)
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             } else if (state != AppState.LOADING) {
                                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                     Text(
