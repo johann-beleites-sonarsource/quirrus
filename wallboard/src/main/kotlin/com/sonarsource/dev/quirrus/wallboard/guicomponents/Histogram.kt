@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,10 +20,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import com.sonarsource.dev.quirrus.wallboard.BuildDataItem
+import com.sonarsource.dev.quirrus.wallboard.FailedBuildData
 import com.sonarsource.dev.quirrus.wallboard.LoadedBuildData
 import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.jetbrains.skia.Font
@@ -99,52 +102,61 @@ fun Histogram(
                 end = Offset(x = maxX, y = zeroYOffset),
             )
 
-            displayItems.filterIsInstance<LoadedBuildData>().forEachIndexed { i, displayItem ->
-                displayItem.rerunsByStatus.filter { (status, _) ->
-                    // Don't display successful tasks that have been successful for a while
-                    status.status != StatusCategory.COMPLETED || status.new
-                }.map { (status, tasks) ->
-                    status to tasks.count()
-                }.partition { (status, _) ->
-                    status.status.isFailingState()
-                }.let { (failed, other) ->
-                    failed.sortedBy { (status, _) -> status } to
-                        other.sortedBy { (status, _) -> status }
-                }.let { (failed, other) ->
-                    val left = maxX - ((barWidth + (2 * barPadding)) * (i + 1)) + barPadding
-                    failed.fold(zeroYOffset) { yOffset, (status, count) ->
-                        val height = stepHeight * count
-                        val top = yOffset - height
-                        drawRect(
-                            color = status.color,
-                            topLeft = Offset(x = left, y = top),
-                            size = Size(width = barWidth, height = height),
-                        )
-                        top
+            displayItems.forEachIndexed { i, displayItem ->
+                val left = maxX - ((barWidth + (2 * barPadding)) * (i + 1)) + barPadding
+
+                if (displayItem is LoadedBuildData) {
+                    displayItem.rerunsByStatus.filter { (status, _) ->
+                        // Don't display successful tasks that have been successful for a while
+                        status.status != StatusCategory.COMPLETED || status.new
+                    }.map { (status, tasks) ->
+                        status to tasks.count()
+                    }.partition { (status, _) ->
+                        status.status.isFailingState()
+                    }.let { (failed, other) ->
+                        failed.sortedBy { (status, _) -> status } to
+                            other.sortedBy { (status, _) -> status }
+                    }.let { (failed, other) ->
+
+                        failed.fold(zeroYOffset) { yOffset, (status, count) ->
+                            val height = stepHeight * count
+                            val top = yOffset - height
+                            drawRect(
+                                color = status.color,
+                                topLeft = Offset(x = left, y = top),
+                                size = Size(width = barWidth, height = height),
+                            )
+                            top
+                        }
+
+                        other.fold(zeroYOffset) { top, (status, count) ->
+                            val height = stepHeight * count
+                            drawRect(
+                                color = status.color,
+                                topLeft = Offset(x = left, y = top),
+                                size = Size(width = barWidth, height = height),
+                            )
+
+                            top + height
+                        }
                     }
-
-                    other.fold(zeroYOffset) { top, (status, count) ->
-                        val height = stepHeight * count
-                        drawRect(
-                            color = status.color,
-                            topLeft = Offset(x = left, y = top),
-                            size = Size(width = barWidth, height = height),
-                        )
-
-                        top + height
-                    }
-
-                    val creationDate = Date(displayItem.baseInfo.buildCreatedTimestamp)
-                    drawText(dateOnly.format(creationDate), left, maxY + 2f)
-                    drawText(timeOnly.format(creationDate), left, maxY + 17f)
+                } else if (displayItem is FailedBuildData) {
+                    drawText("Error", left, maxY - 20f, Color.Red)
+                } else {
+                    drawText("Loading...", left, maxY - 20f)
                 }
+                val creationDate = Date(displayItem.baseInfo.buildCreatedTimestamp)
+                drawText(dateOnly.format(creationDate), left, maxY + 2f)
+                drawText(timeOnly.format(creationDate), left, maxY + 17f)
             }
         }
     }
 }
 
-fun DrawScope.drawText(text: String, x: Float, y: Float) {
+fun DrawScope.drawText(text: String, x: Float, y: Float, color: Color? = null) {
     drawContext.canvas.nativeCanvas.apply {
-        drawTextLine(TextLine.make(text, Font()), x, y, Paint())
+        drawTextLine(TextLine.make(text, Font()), x, y, Paint().apply {
+            color?.let { this.color = it.toArgb() }
+        })
     }
 }
