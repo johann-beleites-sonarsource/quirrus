@@ -1,6 +1,7 @@
 package com.sonarsource.dev.quirrus.wallboard
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,7 +83,7 @@ fun WallboardApp() {
     var branchesTextFieldVal by remember { mutableStateOf(WallboardConfig.branches.joinToString(",")) }
     var repoTextFieldVal by remember { mutableStateOf(repo) }
     var clickPosition by remember { mutableStateOf(-1f) }
-    val taskListScrollState = rememberScrollState(0)
+    val taskListScrollState = mutableStateMapOf<String, ScrollState>()
     var autoRefresh by remember { mutableStateOf(WallboardConfig.autoRefreshEnabled) }
     val backgroundLoadingInProgress by remember { mutableStateOf(mutableStateMapOf<String, Boolean>()) }
     val tasksWithDiffs by remember { mutableStateOf(mutableStateMapOf<String, TaskDiffData?>()) }
@@ -249,12 +250,9 @@ fun WallboardApp() {
                         SideTab(
                             onClick = {
                                 clickPosition = -1f
-                                GlobalScope.launch { taskListScrollState.scrollTo(0) }
                                 selectedTab = branch
                             },
-                            //text = "$branch (${lastTasks.get(branch)?.failed?.size})",
                             text = branch,
-                            //bgColor = if (branch == selectedTab) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant
                             bgColor = ((buildsByBranch(branch)?.firstOrNull() as? LoadedBuildData)?.rerunsByStatus?.keys?.maxByOrNull { it }?.color
                                 ?: Color.Gray),
                             selected = branch == selectedTab
@@ -410,12 +408,16 @@ fun WallboardApp() {
 
                                         Row(modifier = Modifier.weight(0.6f)) {
                                             if (selectedTasks is LoadedBuildData) {
-                                                TaskList(selectedTasks, taskListScrollState, tasksWithDiffs)
+                                                val scrollState = taskListScrollState[selectedTab]
+                                                    ?: rememberScrollState(0).also { taskListScrollState[selectedTab!!] = it }
+
+                                                TaskList(selectedTasks, scrollState, tasksWithDiffs)
                                             } else if (selectedTasks is FailedBuildData) {
                                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                     Column {
                                                         Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                                                            @Composable fun icon() = Icon(
+                                                            @Composable
+                                                            fun icon() = Icon(
                                                                 Icons.Outlined.Warning,
                                                                 contentDescription = "Error",
                                                                 tint = MaterialTheme.colors.error,
