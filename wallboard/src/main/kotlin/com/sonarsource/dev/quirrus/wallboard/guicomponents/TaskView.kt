@@ -57,7 +57,6 @@ fun TaskList(
 
     Box {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(verticalScrollState)) {
-            //items(failed) { task ->
             for ((status, taskReruns) in failed) {
                 taskReruns.forEachIndexed { index, task ->
                     val backgroundColor = if (index == 0) {

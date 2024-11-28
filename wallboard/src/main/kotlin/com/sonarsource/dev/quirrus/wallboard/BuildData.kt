@@ -5,7 +5,6 @@ import com.sonarsource.dev.quirrus.wallboard.data.StatusCategory
 import org.sonarsource.dev.quirrus.generated.graphql.ID
 import org.sonarsource.dev.quirrus.generated.graphql.enums.TaskStatus
 import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
-import java.lang.Exception
 
 typealias TaskReruns = List<org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task>
 

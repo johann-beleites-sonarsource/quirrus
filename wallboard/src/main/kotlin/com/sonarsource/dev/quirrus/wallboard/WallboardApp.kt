@@ -48,9 +48,7 @@ import com.sonarsource.dev.quirrus.wallboard.guicomponents.LoadingScreen
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.SideTab
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TabTitle
 import com.sonarsource.dev.quirrus.wallboard.guicomponents.TaskList
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
@@ -131,28 +129,11 @@ fun WallboardApp() {
                 branch to mutableStateListOf()
             })
 
-            //lastTasks.clear()
-            //lastTasks.putAll(branches.map { it to null })
             branchState.clear()
             branchState.putAll(branches.map { it to AppState.LOADING })
             if (selectedTab !in branches) {
                 selectedTab = branches.firstOrNull()
             }
-            /*reloadData(
-                state,
-                repoTextFieldVal,
-                branches,
-                selectedTab,
-                lastTasks,
-                { state = it; loadingCancelled = false },
-                { error = it },
-                { repoTextFieldVal = it },
-                { selectedTab = it },
-                { saveConfig() },
-                { branch, state -> branchState[branch] = state },
-                { branch, error -> errors[branch] = error },
-                { loadingCancelled },
-            )*/
 
             runCatching {
                 reloadData(
@@ -178,12 +159,6 @@ fun WallboardApp() {
             }
         }
     }
-
-    /*DataProcessing.extractTasksThatRequireLazyLoadingOfDiffRules(dataByBranch, tasksWithDiffs).let {
-        if (it.isNotEmpty()) {
-            updateRulesWithDiff(it, tasksWithDiffs::put, tasksWithDiffs::remove)
-        }
-    }*/ // FIXME
 
     fun triggerAutoRefresh() {
         if (autoRefresh) {

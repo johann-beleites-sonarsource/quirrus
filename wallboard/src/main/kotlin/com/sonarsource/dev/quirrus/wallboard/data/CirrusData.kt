@@ -6,7 +6,6 @@ import org.sonarsource.dev.quirrus.api.ApiConfiguration
 import org.sonarsource.dev.quirrus.api.ApiException
 import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.api.exec
-import org.sonarsource.dev.quirrus.generated.graphql.GET_LAST_N_BUILDS
 import org.sonarsource.dev.quirrus.generated.graphql.GetLastNBuilds
 import org.sonarsource.dev.quirrus.generated.graphql.GetTasksOfSingleBuild
 import org.sonarsource.dev.quirrus.generated.graphql.gettasks.RepositoryBuildsConnection

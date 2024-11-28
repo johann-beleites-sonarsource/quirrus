@@ -6,13 +6,11 @@ import io.ktor.client.statement.request
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.RequestBuilder
 import org.sonarsource.dev.quirrus.api.ApiException
-import org.sonarsource.dev.quirrus.api.LogDownloader
 import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task
 
 internal class BuildDataManager(
