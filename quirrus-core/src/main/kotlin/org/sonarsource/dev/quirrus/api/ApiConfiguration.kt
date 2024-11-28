@@ -16,6 +16,8 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.copyAndClose
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okhttp3.ConnectionPool
 import org.sonarsource.dev.quirrus.common.Logger
@@ -64,10 +66,19 @@ class ApiConfiguration(
     val graphQlClient = GraphQLKtorClient(url = URL("https://api.cirrus-ci.com/graphql"), httpClient = httpClient)
 
     suspend fun <T : Any> sendGraphQlRequest(request: GraphQLClientRequest<T>): GraphQLClientResponse<T> {
-        return graphQlClient.execute(request) {
-            authenticator?.invoke(this)
-            contentType(ContentType.Application.Json)
-        }
+        return runCatching {
+            withTimeout(requestTimeoutOverride ?: 120_000) {
+                async {
+                    graphQlClient.execute(request) {
+                        authenticator?.invoke(this)
+                        contentType(ContentType.Application.Json)
+                    }
+                }
+            }.await()
+        }.onFailure { e ->
+            logger?.error("Failed to send GraphQL request: ${e.message}. Request:\n$request")
+            throw ApiException("Failed to send GraphQL request: ${e.message}")
+        }.getOrNull() ?: throw ApiException("Failed to send GraphQL request")
     }
 
     suspend fun get(url: String) = httpClient.get(url) {

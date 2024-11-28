@@ -13,7 +13,7 @@ import java.nio.file.Path
 
 val API_CONF = ApiConfiguration(
     authenticator = { request -> request.authenticateWithConfigFile(AUTH_CONF_FILE) },
-    requestTimeoutOverride = 30_000
+    requestTimeoutOverride = 90_000
 )
 
 val AUTH_CONF_FILE: Path = QuirrusConfig.directory.resolve("auth.conf")
@@ -23,21 +23,7 @@ private const val MIN_WINDOW_HEIGHT = 900
 
 fun main(args: Array<String>) {
     startWallboard()
-    //foo()
 }
-
-/*fun foo() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "Peach Wallboard",
-        state = WindowState(
-            placement = WindowPlacement.Floating,
-            size = DpSize(MIN_WINDOW_WIDTH.dp, MIN_WINDOW_HEIGHT.dp)
-        ),
-    ) {
-        Test()
-    }
-}*/
 
 fun startWallboard() = application {
     Window(

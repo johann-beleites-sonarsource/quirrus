@@ -21,6 +21,14 @@ enum class StatusCategory(val color: Color) {
             SKIPPED, PAUSED -> STALE
             else -> throw Exception("Unknown task status ${task.status}")
         }
+
+        fun ofCirrusTask(task: org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Task) = when (task.status) {
+            CREATED, TRIGGERED, SCHEDULED, EXECUTING -> IN_PROGRESS
+            TaskStatus.COMPLETED -> if (task.artifacts.any { it.name == "diff_report" && it.files.isNotEmpty() }) DIFF_SNAPSHOT else COMPLETED
+            ABORTED, FAILED -> if (task.firstFailedCommand?.name?.contains("analyze") == true) FAIL_ANALYZE else FAIL_OTHER
+            SKIPPED, PAUSED -> STALE
+            else -> throw Exception("Unknown task status ${task.status}")
+        }
     }
 
     fun isFailingState() = this in listOf(FAIL_ANALYZE, FAIL_OTHER, DIFF_SNAPSHOT)
