@@ -96,9 +96,9 @@ fun WallboardApp() {
             { branch -> displayItems[branch] },
             { id -> displayItemDirectory[id] },
             { state = it },
-        ) {
-            displayItemDirectory[it.baseInfo.id] = it
-        }
+            { displayItemDirectory[it.baseInfo.id] = it },
+            { branch, diff -> tasksWithDiffs[branch] = diff },
+        )
     }
 
     fun saveConfig() {

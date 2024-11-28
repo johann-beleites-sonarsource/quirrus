@@ -8,7 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.sonarsource.dev.quirrus.generated.graphql.gettasksofsinglebuild.Build
 import java.util.concurrent.atomic.AtomicInteger
 
-class AsyncFetchingAssistant(
+class BuildFetchingAssistant(
     private val getBuildData: (String) -> BuildDataItem?,
     private val updateBuildData: (BuildDataItem) -> Unit,
     private val doneHandler: () -> Unit
